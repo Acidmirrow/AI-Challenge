@@ -1,0 +1,51 @@
+name: ai-chat
+
+services:
+  api:
+    build: ./api
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # mock = offline demo, openai = any OpenAI-compatible endpoint
+      PROVIDER: ${PROVIDER:-mock}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com/v1}
+      REASONING_PARAM: ${REASONING_PARAM:-reasoning_effort}
+      MAX_TOKENS_PARAM: ${MAX_TOKENS_PARAM:-}
+      INCLUDE_USAGE: ${INCLUDE_USAGE:-true}
+      MODELS_JSON: ${MODELS_JSON:-}
+      DYNAMIC_MODELS: ${DYNAMIC_MODELS:-false}
+      WEB_SEARCH_BACKEND: ${WEB_SEARCH_BACKEND:-auto}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      BRAVE_API_KEY: ${BRAVE_API_KEY:-}
+      WEB_SEARCH_RESULTS: ${WEB_SEARCH_RESULTS:-5}
+      WEB_SEARCH_PAGES: ${WEB_SEARCH_PAGES:-2}
+      WEB_SEARCH_PAGE_CHARS: ${WEB_SEARCH_PAGE_CHARS:-3000}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).status == 200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  front:
+    build: ./front
+    environment:
+      API_BASE_URL: http://api:8000
+    ports:
+      - "${FRONT_PORT:-8501}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
