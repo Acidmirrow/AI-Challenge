@@ -87,7 +87,9 @@ class MockProvider(Provider):
                 for key, value in (schema.get("properties") or {}).items()
             }
         if schema_type == "array":
-            return [self._sample(schema.get("items") or {})]
+            # держим minItems, иначе демо-ответ не проходит схему списков
+            count = max(int(schema.get("minItems", 1) or 1), 1)
+            return [self._sample(schema.get("items") or {}) for _ in range(min(count, 10))]
         if schema_type == "integer":
             return int(schema.get("minimum", 2024))
         if schema_type == "number":

@@ -116,6 +116,9 @@ def render() -> None:
     formats = backend["formats"]
     presets = backend["presets"]
 
+    schema_mismatch = False
+    mismatch_text = ""
+
     with st.sidebar:
         if backend["error"]:
             st.error("API урока 02 недоступен")
@@ -184,9 +187,8 @@ def render() -> None:
         if spec["needs_schema"]:
             preset_labels = {p["id"]: p["label"] for p in presets}
             # по умолчанию берём пресет, соответствующий выбранному промпту
-            template_preset = PROMPT_TEMPLATES.get(
-                st.session_state.get("fmt_prompt_template", ""), ("", "")
-            )[1]
+            template_name = st.session_state.get("fmt_prompt_template", DEFAULT_PROMPT_TEMPLATE)
+            template_preset = PROMPT_TEMPLATES.get(template_name, ("", ""))[1]
             preset_options = list(preset_labels)
             preset_index = preset_options.index(template_preset) if template_preset in preset_options else 0
             preset_id = st.selectbox("Пресет схемы", options=preset_options,
@@ -197,7 +199,15 @@ def render() -> None:
             schema_text = st.text_area("JSON Schema",
                                        value=json.dumps(preset["schema"], ensure_ascii=False, indent=2),
                                        height=230, key=f"fmt_schema::{chosen_format}::{preset_id}")
-            schema_name = st.text_input("Имя схемы", value=preset_id, key="fmt_schema_name")
+            schema_name = preset_id
+            if preset_id != template_preset:
+                expected_label = preset_labels.get(template_preset, template_preset) or "—"
+                schema_mismatch = True
+                mismatch_text = (
+                    f"Пресет схемы «{preset_labels[preset_id]}» не соответствует промпту "
+                    f"«{template_name}»: для него нужна схема «{expected_label}». "
+                    "Выберите подходящий пресет или смените шаблон промпта."
+                )
             if spec["uses_tools"]:
                 tool_name = st.text_input("Имя инструмента", value="save_result", key="fmt_tool_name")
 
@@ -251,11 +261,15 @@ def render() -> None:
 
     prompt = st.text_area("Данные", height=100, label_visibility="collapsed", key="fmt_prompt")
 
+    if schema_mismatch:
+        st.error(f"{mismatch_text} Прогон заблокирован.")
+
     col_run, col_cmp = st.columns([1, 1])
     run_clicked = col_run.button("▶  Прогнать формат", type="primary", use_container_width=True,
-                                 key="fmt_run")
+                                 key="fmt_run", disabled=schema_mismatch)
     compare_clicked = col_cmp.button("⚖  Сравнить варианты", use_container_width=True,
-                                     key="fmt_compare")
+                                     key="fmt_compare", disabled=schema_mismatch)
+
 
     if run_clicked:
         if not prompt.strip():
@@ -278,6 +292,8 @@ def render() -> None:
                         live.code(buffer[-4000:] or "…",
                                   language="json" if spec["needs_schema"] else "markdown")
                     elif event == "run_result":
+                        if data.get("truncated"):
+                            status.write("⚠️ Ответ обрезан по лимиту max_tokens — он неполный")
                         grade = "✅" if data.get("parse_check", {}).get("ok") else "❌"
                         status.write(f"{grade} ответ разобран")
                     elif event == "result":
@@ -325,6 +341,7 @@ def render() -> None:
                 "вариант": title,
                 "токенов": usage_row.get("completion_tokens") or 0,
                 "finish": result.get("finish_reason") or "—",
+                "лимит": "обрезан" if result.get("finish_reason") == "length" else "ок",
                 "парсится кодом": "да" if check_row.get("ok") else "нет",
                 "валидна схема": ("да" if valid_row.get("valid") else "нет")
                 if valid_row.get("applicable", True) else "—",
@@ -352,6 +369,14 @@ def render() -> None:
             f'completion-токенов: {summary.get("avg_completion_tokens", "—")} · finish: {finish_line}</div>',
             unsafe_allow_html=True,
         )
+        limit = result.get("limit") or {}
+        if first.get("truncated") or limit.get("truncated"):
+            st.error(
+                f"Ответ оборван лимитом вывода: max_tokens = {limit.get('max_tokens', payload['max_tokens'])} "
+                "(finish_reason=length). Модель не успела закончить — текст/JSON неполный. "
+                "Это не ошибка формата ответа: увеличьте «Max tokens» и прогоните снова."
+            )
+
         st.markdown(
             f'<div class="{"verdict-ok" if check.get("ok") else "verdict-bad"}">'
             f'{"✅ Парсится кодом" if check.get("ok") else "❌ Не парсится кодом"} — '

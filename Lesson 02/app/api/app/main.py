@@ -241,6 +241,8 @@ async def _run_format(
         results.append(
             {
                 "finish_reason": finish_reason,
+                # length = модель упёрлась в max_tokens, ответ неполный
+                "truncated": finish_reason == "length",
                 "raw_text": raw_text,
                 "tool_call": tool_call,
                 "parsed": parsed,
@@ -254,7 +256,14 @@ async def _run_format(
                 "elapsed_ms": int((time.perf_counter() - started) * 1000),
             }
         )
-        yield _sse("run_result", {"parse_check": check, "validation": {"valid": not errors}})
+        yield _sse(
+            "run_result",
+            {
+                "parse_check": check,
+                "validation": {"valid": not errors},
+                "truncated": finish_reason == "length",
+            },
+        )
 
         summary = _summarize(results)
         first = results[0] if results else {}
@@ -267,6 +276,10 @@ async def _run_format(
                 "results": results,
                 "summary": summary,
                 "notes": built.notes,
+                "limit": {
+                    "truncated": finish_reason == "length",
+                    "max_tokens": payload.max_tokens,
+                },
                 "sent": {
                     "messages": built.messages,
                     "response_format": built.response_format,

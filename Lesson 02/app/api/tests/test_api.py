@@ -182,6 +182,21 @@ def test_single_request_and_summary(monkeypatch) -> None:
     assert result["summary"]["valid"] == 1
 
 
+def test_truncated_flag_when_output_hits_limit(monkeypatch) -> None:
+    class LengthProvider(Provider):
+        async def stream(self, request: ProviderRequest) -> AsyncIterator[StreamEvent]:
+            yield StreamEvent("delta", text='{"title": "Ма')
+            yield StreamEvent("done", data={"finish_reason": "length", "completion_tokens": 16})
+
+    monkeypatch.setattr(main_module, "build_provider", lambda settings, name=None: LengthProvider())
+    client = TestClient(main_module.create_app())
+
+    result = parse_sse(run(client, max_tokens=100).text)[-1][1]
+    assert result["truncated"] is True
+    assert result["limit"] == {"truncated": True, "max_tokens": 100}
+    assert result["parse_check"]["ok"] is False
+
+
 def test_max_tokens_capped_at_ten_thousand(client: TestClient) -> None:
     assert run(client, max_tokens=10_000).status_code == 200
     assert run(client, max_tokens=10_001).status_code == 422
