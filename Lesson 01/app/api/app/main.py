@@ -12,10 +12,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from .config import Settings, get_settings
+from .properties import loaded_files
 from .models_catalog import Catalog, ModelInfo, build_catalog
 from .providers import Provider, ProviderError, ProviderRequest, StreamEvent, build_provider
-from .schemas import ChatRequest, HealthOut, ModelOut
-from .search import SearchBackend, SearchError, add_page_content, build_search, format_context
+from .schemas import ChatRequest, HealthOut, ModelOut, SearchBackendOut
+from .search import (
+    SearchBackend,
+    SearchError,
+    add_page_content,
+    backend_infos,
+    build_search,
+    format_context,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("ai-chat.api")
@@ -42,16 +50,20 @@ def create_app() -> FastAPI:
     holder: dict[str, Provider] = {}
     search_holder: dict[str, SearchBackend | None] = {}
 
-    def search_backend() -> SearchBackend | None:
-        if "backend" not in search_holder:
-            search_holder["backend"] = build_search(app.state.settings)
-        return search_holder["backend"]
+    def search_backend(name: str | None = None) -> SearchBackend | None:
+        """Cache one instance per backend name so the UI can switch at runtime."""
+        key = (name or app.state.settings.web_search_backend or "off").strip().lower()
+        if key not in search_holder:
+            search_holder[key] = build_search(app.state.settings, key)
+        return search_holder[key]
 
-    def provider() -> Provider:
-        cached = holder.get("provider")
+    def provider(name: str | None = None) -> Provider:
+        """One instance per provider profile, built on first use."""
+        key = name or app.state.settings.provider
+        cached = holder.get(key)
         if cached is None:
-            cached = build_provider(app.state.settings)
-            holder["provider"] = cached
+            cached = build_provider(app.state.settings, key)
+            holder[key] = cached
         return cached
 
     @app.exception_handler(ProviderError)
@@ -69,22 +81,36 @@ def create_app() -> FastAPI:
         try:
             provider()
         except ProviderError as exc:
+            try:
+                search_label = _search_label(search_backend())
+            except SearchError:
+                search_label = "off"
             return HealthOut(
                 status="degraded",
                 provider=settings.provider_label,
                 detail=str(exc),
-                web_search=_search_label(search_backend()),
+                web_search=search_label,
+                config_files=loaded_files(),
             )
+        try:
+            search_label = _search_label(search_backend())
+        except SearchError:
+            search_label = "off"
         return HealthOut(
             status="ok",
             provider=settings.provider_label,
-            web_search=_search_label(search_backend()),
+            web_search=search_label,
+            config_files=loaded_files(),
         )
 
     @app.get("/api/models", response_model=list[ModelOut])
     async def models() -> list[ModelOut]:
         await _maybe_extend_catalog(app.state.catalog, app.state.settings, provider)
         return [ModelOut(**m.as_dict()) for m in app.state.catalog.all()]
+
+    @app.get("/api/search/backends", response_model=list[SearchBackendOut])
+    async def search_backends() -> list[SearchBackendOut]:
+        return [SearchBackendOut(**item) for item in backend_infos(app.state.settings)]
 
     @app.post("/api/chat")
     async def chat(payload: ChatRequest) -> StreamingResponse:
@@ -106,7 +132,9 @@ def create_app() -> FastAPI:
             supports_reasoning=model.supports_reasoning,
             supports_temperature=model.supports_temperature,
         )
-        active = provider()  # raises ProviderError → 503 before streaming starts
+        # a model carries its own provider: mock models hit MockProvider,
+        # real ones hit the configured API profile
+        active = provider(model.provider)  # raises ProviderError → 503 before streaming starts
         logger.info(
             "chat model=%s temperature=%s reasoning=%s messages=%d",
             model.id,
@@ -116,9 +144,13 @@ def create_app() -> FastAPI:
         )
         task = None
         if payload.web_search:
-            backend = search_backend()
+            requested_backend = payload.search_backend or app.state.settings.web_search_backend
+            try:
+                backend = search_backend(payload.search_backend)
+            except SearchError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
             if backend is None:
-                logger.info("web_search requested but no backend configured")
+                logger.info("web_search requested but backend %r is off", requested_backend)
             else:
                 task = _SearchTask(
                     backend=backend,

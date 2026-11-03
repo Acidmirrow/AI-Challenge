@@ -16,23 +16,46 @@
 
 ```bash
 cd "Lesson 01/app"
-cp .env.example .env          # по умолчанию PROVIDER=mock — работает без ключа
-docker compose up --build
+cp config/secrets.properties.example config/secrets.properties   # вписать токены (файл в .gitignore)
+docker compose up -d --build
 ```
 
 - UI: http://localhost:8501
 - API: http://localhost:8000/docs (Swagger)
 
-С реальной моделью — правка `.env`:
+Без ключа тоже работает: в `config/app.properties` можно поставить `provider = mock`.
 
-```ini
-PROVIDER=deepseek
-DEEPSEEK_API_KEY=sk-...                     # ключ DeepSeek
-DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+## Конфигурация: properties-файлы
+
+Все настройки читаются из двух файлов, смонтированных в контейнер (`./config:/srv/config:ro`):
+
+| Файл | В git | Назначение |
+|---|---|---|
+| `config/app.properties` | да | обычная конфигурация: провайдер, base_url, поиск, лимиты |
+| `config/secrets.properties` | **нет** (`.gitignore`) | токены: `deepseek.api.key`, `openai.api.key`, `tavily.api.key`, `brave.api.key` |
+| `config/secrets.properties.example` | да | шаблон без значений |
+
+Формат — Java-properties: `ключ = значение`, комментарии `#` и `!`, значения можно брать в кавычки.
+Ключи нормализуются, поэтому эквивалентны все варианты:
+
+```properties
+deepseek.api.key = sk-...
+deepseek-api-key = sk-...
+DEEPSEEK_API_KEY = sk-...
 ```
 
-```bash
-docker compose up -d --build
+Приоритет (первый побеждает): аргументы процесса → переменные окружения → `.env` → docker secrets →
+`secrets.properties` → `app.properties` → значения по умолчанию.
+
+Деплой на сервере: в репозитории только `app.properties` и `*.example`; реальный
+`secrets.properties` создаётся на машине один раз и монтируется при `docker compose up`.
+В образ секреты не попадают, в `docker inspect` их тоже нет — только файл на хосте.
+
+Файлы, из которых реально прочитана конфигурация, видны в `/api/health`:
+
+```json
+{"status": "ok", "provider": "deepseek @ https://api.deepseek.com/v1",
+ "config_files": ["/srv/config/app.properties", "/srv/config/secrets.properties"]}
 ```
 
 ## Что умеет
@@ -44,7 +67,10 @@ docker compose up -d --build
   у DeepSeek V4 это `none / minimal / low / medium / high / xhigh / ultra / max`, у OpenAI — `low / medium / high`.
   Неверный для модели уровень API отклоняет с 400, UI предлагает только поддерживаемые.
   Текст размышлений провайдер отдаёт в `reasoning_content` — он стримится отдельным SSE-событием в раскрывающийся блок над ответом.
-- **Веб-поиск** — переключатель «🔎 Искать в интернете»: API находит источники (DuckDuckGo keyless, либо Tavily / Brave при наличии ключа), читает текст топ-страниц и передаёт его модели вместе со ссылками; источники показываются под ответом раскрывающимся блоком.
+- **Переключение mock / API** — радио «Источник модели» в сайдбаре: офлайн-демо или реальный провайдер. Каждая модель в `/api/models` несёт поле `provider`, поэтому выбор модели переключает и бэкенд.
+- **Выбор модели** — выпадающий список прямо под кнопкой (Streamlit `st.popover`): модели выбранного источника, галочка на текущей, id и уровни reasoning у каждой.
+- **Слайдеры в стиле ламповых часов** — температура и max tokens: тёмные «трубки» с янтарным свечением и глоу-ползунком.
+- **Веб-поиск** — переключатель «🔎 Искать в интернете» + выбор провайдера: `Авто`, DuckDuckGo, Bing, Brave (HTML) работают без ключа, Brave API и Tavily включаются при наличии ключа. API читает текст топ-страниц и передаёт его модели вместе со ссылками; источники показываются под ответом раскрывающимся блоком.
 - **Промпт-инженерия** — системный промпт, лимит токенов, экспорт диалога в JSON, очистка чата.
 
 ## API
@@ -53,6 +79,7 @@ docker compose up -d --build
 |---|---|---|
 | GET | `/api/health` | Статус и активный провайдер (`ok` / `degraded`) |
 | GET | `/api/models` | Каталог моделей и их возможности |
+| GET | `/api/search/backends` | Доступные поисковые бэкенды и наличие ключей |
 | POST | `/api/chat` | `text/event-stream` со стримом ответа |
 
 Тело `POST /api/chat`:
@@ -91,6 +118,9 @@ event: search
 data: {"query": "...", "backend": "duckduckgo", "results": [{"title": "...", "url": "...", "snippet": "..."}], "error": null}
 ```
 
+Провайдер можно переопределить на конкретный запрос: `"search_backend": "bing"`.
+Неизвестный бэкенд или отсутствующий ключ — HTTP 400 с текстом причины.
+
 Если поиск не удался, `error` содержит причину, `results` пустой, а ответ модели
 всё равно генерируется — поиск никогда не ломает чат.
 
@@ -117,7 +147,7 @@ curl -N -X POST http://localhost:8000/api/chat \
 | `MAX_TOKENS_PARAM` | авто | `max_tokens` / `max_completion_tokens` |
 | `MODELS_JSON` | — | свой каталог моделей (JSON-файл) |
 | `DYNAMIC_MODELS` | `false` | дополнить каталог из `<base_url>/models` |
-| `WEB_SEARCH_BACKEND` | `auto` | `off`, `auto`, `duckduckgo`, `brave-html`, `brave-api`, `tavily` |
+| `WEB_SEARCH_BACKEND` | `auto` | `off`, `auto`, `duckduckgo`, `bing`, `brave-html`, `brave-api`, `tavily` — стартовый бэкенд, переключается в UI |
 | `TAVILY_API_KEY` / `BRAVE_API_KEY` | — | ключи поисковых API (иначе keyless DuckDuckGo) |
 | `WEB_SEARCH_RESULTS` / `WEB_SEARCH_PAGES` / `WEB_SEARCH_PAGE_CHARS` | `5` / `2` / `3000` | сколько выдачи отдавать и сколько читать со страниц |
 | `API_PORT` / `FRONT_PORT` | `8000` / `8501` | порты на хосте |
@@ -162,7 +192,7 @@ docker compose exec api pytest -q        # 7 тестов: health, models, ст�
 
 ## Заметки
 
-- Ключи не попадают в образ: `.env` читается Compose-ом и передаётся как переменные окружения; `.env` в `.gitignore`.
+- Ключи не попадают ни в образ, ни в git: только `config/secrets.properties` на хосте, смонтированный read-only. `.env` теперь держит лишь порты Compose.
 - Ollama на хосте: `OPENAI_BASE_URL=http://host.docker.internal:11434/v1`, `OPENAI_API_KEY=ollama`, `OPENAI_MODELS` под именами из `ollama list`.
 - Контейнеры работают от непривилегированного пользователя (uid 10001).
 - Поиск по умолчанию keyless (DuckDuckGo HTML). Публичные выдачи могут отдавать 429/капчу —

@@ -20,6 +20,7 @@ class ModelInfo:
     reasoning_levels: tuple[str, ...] = ()
     supports_temperature: bool = True
     description: str = ""
+    provider: str = "mock"
 
     @property
     def supports_reasoning(self) -> bool:
@@ -33,6 +34,7 @@ class ModelInfo:
             "supports_temperature": self.supports_temperature,
             "reasoning_levels": list(self.reasoning_levels),
             "description": self.description,
+            "provider": self.provider,
         }
 
 
@@ -41,19 +43,20 @@ class ModelInfo:
 # temperature other than 1, so the API silently omits the parameter.
 
 MOCK_MODELS = [
-    ModelInfo("mock-fast", "Mock · fast", description="Офлайн-эхо без рассуждений"),
-    ModelInfo("mock-reasoner", "Mock · reasoner", DEFAULT_LEVELS, description="Офлайн-модель с имитацией рассуждений"),
+    ModelInfo("mock-fast", "Mock · fast", description="Офлайн-эхо без рассуждений", provider="mock"),
+    ModelInfo("mock-reasoner", "Mock · reasoner", DEFAULT_LEVELS,
+              description="Офлайн-модель с имитацией рассуждений", provider="mock"),
 ]
 
 OPENAI_MODELS = [
     ModelInfo("gpt-5", "GPT-5", DEFAULT_LEVELS, supports_temperature=False,
-              description="Reasoning-модель, effort low/medium/high"),
+              description="Reasoning-модель, effort low/medium/high", provider="openai"),
     ModelInfo("gpt-5-mini", "GPT-5 mini", DEFAULT_LEVELS, supports_temperature=False,
-              description="Удешевлённая reasoning-модель"),
+              description="Удешевлённая reasoning-модель", provider="openai"),
     ModelInfo("o4-mini", "o4-mini", DEFAULT_LEVELS, supports_temperature=False,
-              description="Быстрая reasoning-модель"),
-    ModelInfo("gpt-4.1", "GPT-4.1", description="Универсальная модель, temperature доступна"),
-    ModelInfo("gpt-4.1-mini", "GPT-4.1 mini", description="Небольшая универсальная модель"),
+              description="Быстрая reasoning-модель", provider="openai"),
+    ModelInfo("gpt-4.1", "GPT-4.1", description="Универсальная модель, temperature доступна", provider="openai"),
+    ModelInfo("gpt-4.1-mini", "GPT-4.1 mini", description="Небольшая универсальная модель", provider="openai"),
 ]
 
 # DeepSeek V4 accepts reasoning_effort: none | minimal | low | medium | high |
@@ -63,9 +66,11 @@ DEEPSEEK_LEVELS = ("none", "minimal", "low", "medium", "high", "xhigh", "ultra",
 
 DEEPSEEK_MODELS = [
     ModelInfo("deepseek-flash", "DeepSeek V4.1 Flash", DEEPSEEK_LEVELS,
-              description="Быстрая модель DeepSeek: контекст 1M, текст и изображения"),
+              description="Быстрая модель DeepSeek: контекст 1M, текст и изображения",
+              provider="deepseek"),
     ModelInfo("deepseek-v4-pro", "DeepSeek V4 Pro", DEEPSEEK_LEVELS,
-              description="Старшая модель DeepSeek: контекст 1M, только текст"),
+              description="Старшая модель DeepSeek: контекст 1M, только текст",
+              provider="deepseek"),
 ]
 
 CATALOGS = {
@@ -75,7 +80,7 @@ CATALOGS = {
 }
 
 
-def _from_file(path: str) -> list[ModelInfo]:
+def _from_file(path: str, default_provider: str) -> list[ModelInfo]:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(raw, list):
         raise ValueError("models json must be a list of objects")
@@ -91,6 +96,7 @@ def _from_file(path: str) -> list[ModelInfo]:
                 reasoning_levels=tuple(levels),
                 supports_temperature=bool(item.get("supports_temperature", True)),
                 description=item.get("description", ""),
+                provider=item.get("provider") or default_provider,
             )
         )
     return models
@@ -115,6 +121,15 @@ class Catalog:
 
 
 def build_catalog(settings: Settings) -> Catalog:
+    """Primary provider's models plus the offline mock ones.
+
+    The UI switches between "mock" and the real provider purely by picking a
+    model: every model carries the provider that can actually serve it.
+    """
     if settings.models_json:
-        return Catalog(_from_file(settings.models_json))
-    return Catalog(CATALOGS.get(settings.provider, OPENAI_MODELS))
+        catalog = Catalog(_from_file(settings.models_json, settings.provider))
+    else:
+        catalog = Catalog(CATALOGS.get(settings.provider, OPENAI_MODELS))
+    if settings.provider != "mock":
+        catalog.extend(MOCK_MODELS)
+    return catalog

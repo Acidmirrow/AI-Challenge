@@ -7,6 +7,8 @@ in the SSE `search` event, it never aborts the answer.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import html
 import re
 from abc import ABC, abstractmethod
@@ -208,6 +210,61 @@ def _real_url(href: str) -> str:
     return href
 
 
+class Bing(_HtmlSearch):
+    """Bing web results. Keyless; links come wrapped in bing.com/ck/a redirects."""
+
+    name = "bing"
+
+    async def _fetch(self, query: str) -> str:
+        async with httpx.AsyncClient(timeout=self._timeout, follow_redirects=True) as client:
+            response = await client.get(
+                "https://www.bing.com/search",
+                params={"q": query, "setlang": "ru"},
+                headers={"User-Agent": USER_AGENT, "Accept-Language": "ru,en;q=0.8"},
+            )
+        if response.status_code != 200:
+            raise SearchError(f"Bing HTTP {response.status_code}")
+        return response.text
+
+    async def search(self, query: str, limit: int = 5) -> list[SearchResult]:
+        body = await self._fetch(query)
+        results: list[SearchResult] = []
+        for block in re.findall(r'<li class="b_algo".*?</li>', body, re.S):
+            link = re.search(r'<h2><a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', block, re.S)
+            if not link:
+                continue
+            url = _decode_bing_url(html.unescape(link.group(1)))
+            if not url.startswith("http") or any(r.url == url for r in results):
+                continue
+            snippet = re.search(r'<p[^>]*>(.*?)</p>', block, re.S)
+            results.append(
+                SearchResult(
+                    title=_clean(link.group(2)) or url,
+                    url=url,
+                    snippet=_clean(snippet.group(1)) if snippet else "",
+                )
+            )
+            if len(results) >= limit:
+                break
+        if not results:
+            raise SearchError("Bing не вернул результатов (разметка изменилась?)")
+        return results
+
+
+def _decode_bing_url(href: str) -> str:
+    """Bing wraps results as /ck/a?...&u=a1<base64url-of-target>."""
+    if "bing.com/ck/a" not in href:
+        return href
+    raw = parse_qs(urlparse(href).query).get("u", [""])[0]
+    if raw.startswith("a1"):
+        raw = raw[2:]
+    padded = raw + "=" * (-len(raw) % 4)
+    try:
+        return base64.urlsafe_b64decode(padded).decode("utf-8", "ignore")
+    except (ValueError, binascii.Error):
+        return href
+
+
 class Tavily(SearchBackend):
     """Tavily search API — highest quality, needs a key."""
 
@@ -261,30 +318,77 @@ class BraveApi(SearchBackend):
         ]
 
 
-def build_search(settings: Settings) -> SearchBackend | None:
-    """Resolve the configured backend; ``auto`` picks the best available."""
-    backend = (settings.web_search_backend or "off").strip().lower()
+@dataclass(frozen=True)
+class BackendInfo:
+    """A search backend the UI can offer."""
+
+    name: str
+    label: str
+    requires_key: str = ""
+    note: str = ""
+
+
+BACKENDS: tuple[BackendInfo, ...] = (
+    BackendInfo("auto", "Авто (лучший доступный)", note="ключевые API → keyless"),
+    BackendInfo("duckduckgo", "DuckDuckGo", note="без ключа"),
+    BackendInfo("bing", "Bing", note="без ключа"),
+    BackendInfo("brave-html", "Brave (HTML)", note="без ключа, бывает 429"),
+    BackendInfo("brave-api", "Brave API", requires_key="brave_api_key", note="нужен BRAVE_API_KEY"),
+    BackendInfo("tavily", "Tavily", requires_key="tavily_api_key", note="нужен TAVILY_API_KEY"),
+)
+
+
+def backend_infos(settings: Settings) -> list[dict]:
+    """Catalog for the UI: what exists, what is usable, what is the default."""
+    default = (settings.web_search_backend or "off").strip().lower()
+    items = []
+    for backend in BACKENDS:
+        available = not backend.requires_key or bool(getattr(settings, backend.requires_key, ""))
+        items.append(
+            {
+                "name": backend.name,
+                "label": backend.label,
+                "available": available,
+                "requires_key": backend.requires_key,
+                "note": backend.note,
+                "is_default": backend.name == default,
+            }
+        )
+    return items
+
+
+def build_search(settings: Settings, name: str | None = None) -> SearchBackend | None:
+    """Resolve a backend by name (``auto`` = best available), ``None`` for off."""
+    backend = (name or settings.web_search_backend or "off").strip().lower()
     timeout = settings.web_search_timeout_s
 
     if backend in ("off", "none", "disabled"):
         return None
-    if backend == "tavily":
-        return Tavily(settings.tavily_api_key, timeout) if settings.tavily_api_key else None
-    if backend == "brave-api":
-        return BraveApi(settings.brave_api_key, timeout) if settings.brave_api_key else None
     if backend == "duckduckgo":
         return DuckDuckGo(timeout)
+    if backend == "bing":
+        return Bing(timeout)
     if backend in ("brave-html", "brave"):
         return BraveHtml(timeout)
-
-    # auto: keyed APIs first, keyless scraping last
-    candidates: list[SearchBackend] = []
-    if settings.tavily_api_key:
-        candidates.append(Tavily(settings.tavily_api_key, timeout))
-    if settings.brave_api_key:
-        candidates.append(BraveApi(settings.brave_api_key, timeout))
-    candidates.extend([DuckDuckGo(timeout), BraveHtml(timeout)])
-    return Chain(candidates)
+    if backend == "tavily":
+        if not settings.tavily_api_key:
+            raise SearchError("Для Tavily нужен TAVILY_API_KEY в .env")
+        return Tavily(settings.tavily_api_key, timeout)
+    if backend == "brave-api":
+        if not settings.brave_api_key:
+            raise SearchError("Для Brave API нужен BRAVE_API_KEY в .env")
+        return BraveApi(settings.brave_api_key, timeout)
+    if backend == "auto":
+        candidates: list[SearchBackend] = []
+        if settings.tavily_api_key:
+            candidates.append(Tavily(settings.tavily_api_key, timeout))
+        if settings.brave_api_key:
+            candidates.append(BraveApi(settings.brave_api_key, timeout))
+        candidates.extend([DuckDuckGo(timeout), Bing(timeout), BraveHtml(timeout)])
+        return Chain(candidates)
+    raise SearchError(
+        f"Неизвестный бэкенд поиска {backend!r}. Доступно: " + ", ".join(b.name for b in BACKENDS)
+    )
 
 
 def format_context(query: str, results: Iterable[SearchResult]) -> str:

@@ -72,8 +72,8 @@ class MockProvider(Provider):
             f"- max tokens: `{request.max_tokens}`\n\n"
             "Этот ответ сгенерирован офлайн, без обращения к внешнему API — "
             "стек работает целиком: Streamlit → FastAPI → SSE → браузер. "
-            "Чтобы получить ответ настоящей модели, задай `PROVIDER=openai`, "
-            "`OPENAI_API_KEY` и `OPENAI_BASE_URL` в `.env`."
+            "Чтобы получить ответ настоящей модели, задай `provider` в "
+            "`config/app.properties` и токен в `config/secrets.properties`."
         )
 
     async def _chunks(self, text: str, size: int) -> AsyncGenerator[str, None]:

@@ -13,13 +13,18 @@ from app.models_catalog import ModelInfo, build_catalog
 def test_deepseek_catalog_exposes_v4_models() -> None:
     catalog = build_catalog(Settings(provider="deepseek"))
     ids = [m.id for m in catalog.all()]
-    assert ids == ["deepseek-flash", "deepseek-v4-pro"]
+    # real models first, offline mock ones appended so the UI can switch
+    assert ids[:2] == ["deepseek-flash", "deepseek-v4-pro"]
+    assert {"mock-fast", "mock-reasoner"} <= set(ids)
 
     flash = catalog.get("deepseek-flash")
     assert flash is not None
     assert flash.supports_reasoning is True
     assert flash.supports_temperature is True
+    assert flash.provider == "deepseek"
     assert "none" in flash.reasoning_levels and "max" in flash.reasoning_levels
+    mock_model = catalog.get("mock-reasoner")
+    assert mock_model is not None and mock_model.provider == "mock"
 
 
 def test_deepseek_profile_resolves_its_own_key_and_host() -> None:

@@ -1,12 +1,34 @@
 from functools import lru_cache
+from typing import Any
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+from .properties import PropertiesSource
 
 
 class Settings(BaseSettings):
     """Runtime configuration, read from environment / .env file."""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+        **_: Any,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Priority: init > env > .env > docker secrets > properties files."""
+        return (
+            init_settings,
+            env_settings,
+            dotenv_settings,
+            file_secret_settings,
+            PropertiesSource(settings_cls),
+        )
 
     # mock | openai | deepseek
     #   mock     — офлайн-демо, ключ не нужен

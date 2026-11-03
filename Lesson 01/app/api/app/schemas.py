@@ -22,6 +22,8 @@ class ChatRequest(BaseModel):
     temperature: float | None = Field(default=0.7, ge=0.0, le=2.0)
     reasoning: ReasoningLevel = Field(default="off", max_length=16)
     web_search: bool = False
+    # optional override of the search backend for this request
+    search_backend: str | None = Field(default=None, max_length=32)
     max_tokens: int | None = Field(default=1024, ge=16, le=32_768)
 
     @field_validator("messages")
@@ -39,6 +41,16 @@ class ModelOut(BaseModel):
     supports_temperature: bool
     reasoning_levels: list[str] = []
     description: str = ""
+    provider: str = "mock"
+
+
+class SearchBackendOut(BaseModel):
+    name: str
+    label: str
+    available: bool
+    requires_key: str = ""
+    note: str = ""
+    is_default: bool = False
 
 
 class HealthOut(BaseModel):
@@ -46,3 +58,4 @@ class HealthOut(BaseModel):
     provider: str
     detail: str = ""
     web_search: str = "off"
+    config_files: list[str] = []
