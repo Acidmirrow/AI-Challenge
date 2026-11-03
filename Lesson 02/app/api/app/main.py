@@ -24,7 +24,7 @@ from .models_catalog import ModelInfo, build_catalog
 from .properties import loaded_files
 from .providers import Provider, ProviderError, ProviderRequest, build_provider
 from .schemas import FormatOut, FormatRunRequest, HealthOut, ModelOut
-from .validation import InvalidSchema, check_schema, repair_messages, validate
+from .validation import InvalidSchema, check_schema, validate
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("format-lab.api")
@@ -128,12 +128,12 @@ def create_app() -> FastAPI:
         reasoning = _resolve_reasoning(model, payload.reasoning)
         active = provider(model.provider)
         logger.info(
-            "run format=%s model=%s reasoning=%s schema=%s repair=%s",
+            "run format=%s model=%s reasoning=%s schema=%s max_tokens=%s",
             spec.id,
             model.id,
             reasoning,
             bool(payload.schema_),
-            payload.auto_repair,
+            payload.max_tokens,
         )
         return StreamingResponse(
             _run_format(active, spec, model, payload, reasoning),
@@ -183,99 +183,78 @@ async def _run_format(
         system_prompt=payload.system_prompt,
         supports_json_schema=model.supports_json_schema,
     )
-    max_attempts = 2 if payload.auto_repair and spec.needs_schema else 1
     results: list[dict] = []
 
     try:
-        for run_index in range(payload.runs):
-            messages = built.messages
-            attempts = 0
+        yield _sse(
+            "start",
+            {
+                "format": spec.id,
+                "model": model.id,
+                "tool_choice": built.tool_choice if spec.uses_tools else None,
+                "notes": built.notes,
+            },
+        )
+        started = time.perf_counter()
+        raw_text, tool_args, tool_name, finish_reason, usage = "", "", None, None, {}
 
-            while attempts < max_attempts:
-                attempts += 1
-                yield _sse(
-                    "start",
-                    {
-                        "format": spec.id,
-                        "model": model.id,
-                        "run": run_index + 1,
-                        "runs": payload.runs,
-                        "attempt": attempts,
-                        "tool_choice": built.tool_choice if spec.uses_tools else None,
-                        "notes": built.notes,
-                    },
-                )
-                started = time.perf_counter()
-                raw_text, tool_args, tool_name, finish_reason, usage = "", "", None, None, {}
+        request = ProviderRequest(
+            messages=built.messages,
+            model=model.id,
+            temperature=payload.temperature if model.supports_temperature else None,
+            reasoning=reasoning,
+            max_tokens=payload.max_tokens,
+            supports_reasoning=model.supports_reasoning,
+            supports_temperature=model.supports_temperature,
+            response_format=built.response_format,
+            stop=payload.stop,
+            tools=built.tools,
+            tool_choice=built.tool_choice,
+            schema=payload.schema_,
+            schema_name=payload.schema_name,
+            tool_name=payload.tool_name,
+        )
+        async for event in provider_obj.stream(request):
+            if event.type == "delta":
+                raw_text += event.text
+                yield _sse("delta", {"kind": "text", "text": event.text})
+            elif event.type == "tool_delta":
+                tool_args += event.text
+                yield _sse("delta", {"kind": "tool_args", "text": event.text})
+            elif event.type == "done":
+                finish_reason = event.data.get("finish_reason")
+                tool_name = event.data.get("tool_name")
+                usage = {
+                    key: event.data[key]
+                    for key in ("prompt_tokens", "completion_tokens", "total_tokens")
+                    if key in event.data
+                }
 
-                request = ProviderRequest(
-                    messages=messages,
-                    model=model.id,
-                    temperature=payload.temperature if model.supports_temperature else None,
-                    reasoning=reasoning,
-                    max_tokens=payload.max_tokens,
-                    supports_reasoning=model.supports_reasoning,
-                    supports_temperature=model.supports_temperature,
-                    response_format=built.response_format,
-                    stop=payload.stop,
-                    tools=built.tools,
-                    tool_choice=built.tool_choice,
-                    schema=payload.schema_,
-                    schema_name=payload.schema_name,
-                    tool_name=payload.tool_name,
-                )
-                async for event in provider_obj.stream(request):
-                    if event.type == "delta":
-                        raw_text += event.text
-                        yield _sse("delta", {"kind": "text", "text": event.text})
-                    elif event.type == "tool_delta":
-                        tool_args += event.text
-                        yield _sse("delta", {"kind": "tool_args", "text": event.text})
-                    elif event.type == "done":
-                        finish_reason = event.data.get("finish_reason")
-                        tool_name = event.data.get("tool_name")
-                        usage = {
-                            key: event.data[key]
-                            for key in ("prompt_tokens", "completion_tokens", "total_tokens")
-                            if key in event.data
-                        }
+        parsed, tool_call, parse_error = parse_payload(spec, raw_text, tool_args, tool_name)
+        errors = (
+            [{"path": "(root)", "message": parse_error, "validator": "json"}]
+            if parse_error
+            else validate(parsed, payload.schema_ or {}) if spec.needs_schema else []
+        )
 
-                parsed, tool_call, parse_error = parse_payload(spec, raw_text, tool_args, tool_name)
-                errors = (
-                    [{"path": "(root)", "message": parse_error, "validator": "json"}]
-                    if parse_error
-                    else validate(parsed, payload.schema_ or {}) if spec.needs_schema else []
-                )
-
-                if errors and attempts < max_attempts:
-                    yield _sse(
-                        "repair",
-                        {"run": run_index + 1, "attempt": attempts + 1, "errors": errors},
-                    )
-                    messages = repair_messages(built.messages, raw_text or tool_args, errors)
-                    continue
-
-                check = parse_check(spec, raw_text, tool_call)
-                results.append(
-                    {
-                        "run": run_index + 1,
-                        "attempts": attempts,
-                        "finish_reason": finish_reason,
-                        "raw_text": raw_text,
-                        "tool_call": tool_call,
-                        "parsed": parsed,
-                        "validation": {
-                            "valid": not errors,
-                            "errors": errors,
-                            "applicable": bool(spec.needs_schema),
-                        },
-                        "parse_check": check,
-                        "usage": usage,
-                        "elapsed_ms": int((time.perf_counter() - started) * 1000),
-                    }
-                )
-                yield _sse("run_result", {"run": run_index + 1, "parse_check": check, "validation": {"valid": not errors}})
-                break
+        check = parse_check(spec, raw_text, tool_call)
+        results.append(
+            {
+                "finish_reason": finish_reason,
+                "raw_text": raw_text,
+                "tool_call": tool_call,
+                "parsed": parsed,
+                "validation": {
+                    "valid": not errors,
+                    "errors": errors,
+                    "applicable": bool(spec.needs_schema),
+                },
+                "parse_check": check,
+                "usage": usage,
+                "elapsed_ms": int((time.perf_counter() - started) * 1000),
+            }
+        )
+        yield _sse("run_result", {"parse_check": check, "validation": {"valid": not errors}})
 
         summary = _summarize(results)
         first = results[0] if results else {}

@@ -66,22 +66,3 @@ def validate(instance: Any, schema: dict[str, Any]) -> list[dict[str, str]]:
     return errors
 
 
-def error_digest(errors: list[dict[str, str]]) -> str:
-    """Компактный текст ошибок для промпта-исправления."""
-    return "\n".join(f"- {item['path']}: {item['message']}" for item in errors)
-
-
-def repair_messages(original: list[dict], raw_answer: str, errors: list[dict[str, str]]) -> list[dict]:
-    """Сообщения второго прохода: показать модели её ответ и список нарушений."""
-    return [
-        *original,
-        {"role": "assistant", "content": raw_answer},
-        {
-            "role": "user",
-            "content": (
-                "Ответ не прошёл валидацию по JSON Schema:\n"
-                f"{error_digest(errors)}\n\n"
-                "Верни исправленный JSON-объект целиком, без пояснений и без ```."
-            ),
-        },
-    ]

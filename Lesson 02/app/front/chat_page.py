@@ -218,10 +218,10 @@ def render() -> None:
                                     default=0.7, key="chat_temperature",
                                     fmt=lambda v: f"{v:.1f}",
                                     disabled=not current["supports_temperature"])
-        max_tokens = _nixie_slider("Max tokens", min_value=128, max_value=32768, step=128,
-                                   default=1024, key="chat_max_tokens",
-                                   fmt=lambda v: f"{int(v):04d}",
-                                   help="Предел длины ответа в токенах")
+        max_tokens = _nixie_slider("Max tokens", min_value=100, max_value=10_000, step=100,
+                                   default=1_000, key="chat_max_tokens",
+                                   fmt=lambda v: f"{int(v):05d}",
+                                   help="Предел длины ответа: до 10 000 токенов")
 
         levels = current.get("reasoning_levels") or []
         if levels:

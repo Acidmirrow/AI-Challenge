@@ -215,15 +215,13 @@ def render() -> None:
                                     default=0.2, key="fmt_temperature",
                                     fmt=lambda v: f"{v:.1f}",
                                     disabled=not current["supports_temperature"])
-        max_tokens = _nixie_slider("Max tokens", min_value=128, max_value=32768, step=128,
-                                   default=1024, key="fmt_max_tokens",
-                                   fmt=lambda v: f"{int(v):04d}",
-                                   help="Предел длины ответа в токенах")
+        max_tokens = _nixie_slider("Max tokens", min_value=100, max_value=10_000, step=100,
+                                   default=1_000, key="fmt_max_tokens",
+                                   fmt=lambda v: f"{int(v):05d}",
+                                   help="Предел длины ответа: до 10 000 токенов")
         stop_raw = st.text_input("Stop sequence", value="", placeholder="\n\n  или  5, Плутон",
                                  key="fmt_stop",
                                  help="Обрыв генерации на первой из последовательностей (через запятую)")
-        auto_repair = st.toggle("Авто-исправление", value=True, key="fmt_repair")
-        runs = st.slider("Прогонов", 1, 5, 1, key="fmt_runs")
 
     payload = {
         "format": chosen_format,
@@ -232,8 +230,6 @@ def render() -> None:
         "temperature": temperature,
         "reasoning": reasoning,
         "max_tokens": max_tokens,
-        "auto_repair": bool(auto_repair),
-        "runs": runs,
         "stop": _parse_stop(stop_raw),
         "system_prompt": system_prompt.strip() or None,
     }
@@ -273,8 +269,7 @@ def render() -> None:
             with st.status(f"Формат: {spec['label']}", expanded=True) as status:
                 for event, data in post_stream("/api/format/run", payload, FORMAT_API):
                     if event == "start":
-                        status.write(f"Прогон {data.get('run')}/{data.get('runs')}, "
-                                     f"попытка {data.get('attempt')}")
+                        status.write(f"Модель {data.get('model')}, формат {data.get('format')}")
                         for note in data.get("notes") or []:
                             status.write(f"⚠️ {note}")
                         buffer = ""
@@ -282,11 +277,9 @@ def render() -> None:
                         buffer += data.get("text", "")
                         live.code(buffer[-4000:] or "…",
                                   language="json" if spec["needs_schema"] else "markdown")
-                    elif event == "repair":
-                        status.write(f"↻ Не прошло валидацию, исправляю (попытка {data.get('attempt')})")
                     elif event == "run_result":
                         grade = "✅" if data.get("parse_check", {}).get("ok") else "❌"
-                        status.write(f"{grade} прогон {data.get('run')} разобран")
+                        status.write(f"{grade} ответ разобран")
                     elif event == "result":
                         st.session_state.fmt_result = data
                         status.update(label="Готово", state="complete")
@@ -300,44 +293,42 @@ def render() -> None:
         variants = [
             ("Без ограничений",
              {"format": "text", "max_tokens": 900, "stop": None, "system_prompt": None,
-              "auto_repair": False, "reasoning": "none"}),
+              "reasoning": "none"}),
             ("С ограничениями",
              {"format": "text", "max_tokens": 200, "stop": ["\n3."],
               "system_prompt": "Ответь ровно тремя пунктами, каждый не длиннее 90 символов.",
-              "auto_repair": False, "reasoning": "none"}),
+              "reasoning": "none"}),
             ("Строгая схема",
              {"format": "json_object", "schema": base_schema, "schema_name": "strict",
               "max_tokens": 900, "stop": None, "system_prompt": None,
-              "auto_repair": True, "reasoning": "none"}),
+              "reasoning": "none"}),
         ]
         rows = []
         progress = st.progress(0.0, text="Сравнение вариантов…")
-        done, total = 0, len(variants) * runs
+        done, total = 0, len(variants)
         for title, overrides in variants:
-            collected = []
-            for _ in range(runs):
-                trial = {**payload, "prompt": prompt.strip(), **overrides}
-                result, error = _collect(trial)
-                collected.append(result if result else {"error": error})
-                done += 1
-                progress.progress(done / total, text=f"{title}: прогон {len(collected)}/{runs}")
-            ok = [item for item in collected if not item.get("error")]
-            parseable = sum(1 for item in ok if item["parse_check"]["ok"])
-            applicable = [item for item in ok if item["validation"].get("applicable", True)]
-            valid = sum(1 for item in applicable if item["validation"]["valid"])
-            tokens = [item["usage"].get("completion_tokens") or 0 for item in ok]
-            finishes: dict[str, int] = {}
-            for item in ok:
-                key = item.get("finish_reason") or "none"
-                finishes[key] = finishes.get(key, 0) + 1
+            trial = {**payload, "prompt": prompt.strip(), **overrides}
+            result, error = _collect(trial)
+            done += 1
+            progress.progress(done / total, text=title)
+            if result is None:
+                rows.append({
+                    "вариант": title, "токенов": 0, "finish": "—",
+                    "парсится кодом": "нет", "валидна схема": "—",
+                    "детали разбора": (error or {}).get("message", "ошибка")[:70],
+                })
+                continue
+            check_row = result.get("parse_check") or {}
+            valid_row = result.get("validation") or {}
+            usage_row = result.get("usage") or {}
             rows.append({
                 "вариант": title,
-                "прогонов": len(collected),
-                "ср. токенов": round(sum(tokens) / len(tokens), 1) if tokens else 0,
-                "finish": ", ".join(f"{k}×{v}" for k, v in finishes.items()) or "—",
-                "парсится кодом": f"{parseable}/{len(collected)}",
-                "валидна схема": f"{valid}/{len(applicable)}" if applicable else "—",
-                "детали разбора": (ok[0]["parse_check"]["detail"] if ok else "ошибка")[:70],
+                "токенов": usage_row.get("completion_tokens") or 0,
+                "finish": result.get("finish_reason") or "—",
+                "парсится кодом": "да" if check_row.get("ok") else "нет",
+                "валидна схема": ("да" if valid_row.get("valid") else "нет")
+                if valid_row.get("applicable", True) else "—",
+                "детали разбора": (check_row.get("detail") or "—")[:70],
             })
         progress.empty()
         st.session_state.fmt_comparison = rows
@@ -355,10 +346,10 @@ def render() -> None:
         validation = first.get("validation") or {}
         check = first.get("parse_check") or {}
 
+        finish_line = ", ".join(summary.get("finish_reasons", {}) or {}) or "—"
         st.markdown(
             f'<div class="meta-line">{result["format"]} · {result["model"]} · '
-            f'прогонов: {result.get("runs", 1)} · ср. completion-токенов: '
-            f'{summary.get("avg_completion_tokens", "—")} · finish: {summary.get("finish_reasons", "—")}</div>',
+            f'completion-токенов: {summary.get("avg_completion_tokens", "—")} · finish: {finish_line}</div>',
             unsafe_allow_html=True,
         )
         st.markdown(
@@ -375,16 +366,6 @@ def render() -> None:
             )
         else:
             st.caption("Схема не применяется: формат неструктурированный")
-
-        if len(results) > 1:
-            st.dataframe(
-                [{"прогон": item["run"], "finish": item.get("finish_reason"),
-                  "токенов": item["usage"].get("completion_tokens"),
-                  "парсится": "да" if item["parse_check"]["ok"] else "нет",
-                  "схема": "ok" if item["validation"]["valid"] else "нет",
-                  "ms": item["elapsed_ms"]} for item in results],
-                use_container_width=True, hide_index=True,
-            )
 
         tabs = st.tabs(["Результат", "Сырой ответ", "Валидация", "Что отправлено"])
         with tabs[0]:

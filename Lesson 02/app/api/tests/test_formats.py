@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.formats import FORMATS_BY_ID, build_format_request, parse_check, parse_payload
-from app.validation import InvalidSchema, check_schema, repair_messages, validate
+from app.validation import InvalidSchema, check_schema, validate
 
 MOVIE_SCHEMA = {
     "type": "object",
@@ -171,11 +171,3 @@ def test_stop_passed_to_provider_kwargs() -> None:
     )
     assert kwargs["stop"] == ["\n\n", "5"]
 
-
-def test_repair_messages_include_errors_and_original_answer() -> None:
-    base = [{"role": "user", "content": "матрица"}]
-    messages = repair_messages(base, '{"title": "Матрица"}', validate({"title": "Матрица"}, MOVIE_SCHEMA))
-    assert messages[0] == base[0]
-    assert messages[1]["role"] == "assistant"
-    assert "year" in messages[2]["content"]
-    assert "исправленный JSON" in messages[2]["content"]

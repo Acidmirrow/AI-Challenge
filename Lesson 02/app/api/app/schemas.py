@@ -16,15 +16,12 @@ class FormatRunRequest(BaseModel):
 
     temperature: float | None = Field(default=0.2, ge=0.0, le=2.0)
     reasoning: str = Field(default="off", max_length=16)
-    max_tokens: int | None = Field(default=1024, ge=16, le=32_768)
-    auto_repair: bool = True
+    max_tokens: int | None = Field(default=1024, ge=16, le=10_000)
 
     # Явное описание формата ответа: заменяет встроенную подсказку формата.
     system_prompt: str | None = Field(default=None, max_length=4_000)
     # Stop sequences: генерация обрывается на первой из них.
     stop: list[str] | None = Field(default=None, max_length=4)
-    # Сколько раз прогнать один и тот же запрос (для сравнения стабильности).
-    runs: int = Field(default=1, ge=1, le=5)
 
     @field_validator("stop")
     @classmethod

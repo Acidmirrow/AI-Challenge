@@ -71,7 +71,6 @@ def run(client: TestClient, **overrides):
         "schema_name": "movie",
         "temperature": 0.2,
         "reasoning": "off",
-        "auto_repair": True,
     }
     payload.update(overrides)
     return client.post("/api/format/run", json=payload)
@@ -107,7 +106,7 @@ def test_json_object_run_is_valid(client: TestClient) -> None:
     result = events[-1][1]
     assert result["parsed"]["title"] == "Матрица"
     assert result["validation"]["valid"] is True
-    assert result["attempts"] == 1
+    assert result["runs"] == 1
     assert result["sent"]["response_format"] == {"type": "json_object"}
 
 
@@ -116,30 +115,13 @@ def test_validation_failure_is_reported(monkeypatch) -> None:
     monkeypatch.setattr(main_module, "build_provider", lambda settings, name=None: provider)
     client = TestClient(main_module.create_app())
 
-    result = parse_sse(run(client, auto_repair=False).text)[-1][1]
+    events = parse_sse(run(client).text)
+    result = events[-1][1]
     assert result["validation"]["valid"] is False
     assert {item["path"] for item in result["validation"]["errors"]} == {"year", "rating"}
-    assert result["attempts"] == 1
-
-
-def test_auto_repair_makes_second_attempt(monkeypatch) -> None:
-    provider = ScriptedProvider(
-        ['{"title": "Матрица"}', '{"title": "Матрица", "year": 1999, "rating": 8.7}']
-    )
-    monkeypatch.setattr(main_module, "build_provider", lambda settings, name=None: provider)
-    client = TestClient(main_module.create_app())
-
-    events = parse_sse(run(client, auto_repair=True).text)
-    kinds = [kind for kind, _ in events]
-    assert "repair" in kinds
-    result = events[-1][1]
-    assert result["attempts"] == 2
-    assert result["validation"]["valid"] is True
-    assert len(provider.requests) == 2
-    # второй запрос содержит ответ модели и перечень ошибок
-    retry_messages = provider.requests[1].messages
-    assert retry_messages[-2]["role"] == "assistant"
-    assert "year" in retry_messages[-1]["content"]
+    # авто-ремонта больше нет: один запрос, без события repair
+    assert len(provider.requests) == 1
+    assert "repair" not in [kind for kind, _ in events]
 
 
 def test_unsupported_format_surfaces_provider_error(monkeypatch) -> None:
@@ -186,19 +168,24 @@ def test_stop_and_system_prompt_reach_provider(monkeypatch) -> None:
     assert "JSON Schema" in system  # схема дописывается к явному описанию формата
 
 
-def test_runs_repeat_request_and_summarise(monkeypatch) -> None:
+def test_single_request_and_summary(monkeypatch) -> None:
     provider = ScriptedProvider(['{"title": "Матрица", "year": 1999, "rating": 8.7}'])
     monkeypatch.setattr(main_module, "build_provider", lambda settings, name=None: provider)
     client = TestClient(main_module.create_app())
 
-    result = parse_sse(run(client, runs=3).text)[-1][1]
-    assert len(provider.requests) == 3
-    assert result["runs"] == 3
-    assert len(result["results"]) == 3
-    assert result["summary"]["runs"] == 3
-    assert result["summary"]["parseable"] == 3
-    assert result["summary"]["valid"] == 3
-    assert all(item["parse_check"]["kind"] == "json" for item in result["results"])
+    result = parse_sse(run(client).text)[-1][1]
+    assert len(provider.requests) == 1  # один прогон — один запрос
+    assert result["runs"] == 1
+    assert len(result["results"]) == 1
+    assert result["summary"]["runs"] == 1
+    assert result["summary"]["parseable"] == 1
+    assert result["summary"]["valid"] == 1
+
+
+def test_max_tokens_capped_at_ten_thousand(client: TestClient) -> None:
+    assert run(client, max_tokens=10_000).status_code == 200
+    assert run(client, max_tokens=10_001).status_code == 422
+    assert run(client, max_tokens=32_768).status_code == 422
 
 
 def test_parse_check_present_for_plain_text(monkeypatch) -> None:
