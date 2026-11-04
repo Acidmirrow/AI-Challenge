@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 from typing import Any, AsyncGenerator, AsyncIterator
 
@@ -58,6 +59,20 @@ class MockProvider(Provider):
     # -- helpers --------------------------------------------------------------
     def _prose(self, request: ProviderRequest) -> str:
         question = request.messages[-1]["content"] if request.messages else ""
+        # проверяющий совет возвращает JSON — демо тоже должно его отдавать
+        if "verdicts" in question or "верни json" in question.lower():
+            ids = re.findall(r"id=([A-Za-z_]+)", question)
+            verdicts = [
+                {
+                    "expert": expert_id,
+                    "verdict": "ok" if index % 2 == 0 else "wrong",
+                    "comment": "демо-проверка: арифметика сходится"
+                    if index % 2 == 0 else "демо-проверка: расхождение в счёте",
+                }
+                for index, expert_id in enumerate(ids)
+            ]
+            return json.dumps({"verdicts": verdicts, "final_answer": "демо-ответ совета"},
+                              ensure_ascii=False)
         if any("Markdown" in m.get("content", "") for m in request.messages[:1]):
             return (
                 "| Поле | Значение |\n|---|---|\n"

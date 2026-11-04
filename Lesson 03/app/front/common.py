@@ -113,6 +113,15 @@ def post_stream(path: str, payload: dict, base: str) -> Iterator[tuple[str, dict
         yield from parse_sse(response.iter_lines())
 
 
+def selectable_models(models: list[dict]) -> list[dict]:
+    """Модели для выбора в UI: офлайн-mock скрыт, если настроен реальный провайдер.
+
+    Mock остаётся только как аварийный вариант — когда других моделей нет.
+    """
+    real = [item for item in models if item.get("provider") != "mock"]
+    return real or list(models)
+
+
 def nixie_digits(text: str) -> str:
     cells = []
     for char in text:

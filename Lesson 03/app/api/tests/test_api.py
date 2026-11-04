@@ -193,6 +193,92 @@ def test_compare_runs_every_strategy(client: TestClient) -> None:
     assert len(client.provider.requests) == len(STRATEGY_IDS)  # type: ignore[attr-defined]
 
 
+# -- совет экспертов ----------------------------------------------------------
+def test_council_lists_two_groups(client: TestClient) -> None:
+    body = client.get("/api/council").json()
+    assert [item["id"] for item in body["solvers"]] == [
+        "analyst", "engineer", "critic", "manager"
+    ]
+    assert [item["id"] for item in body["reviewers"]] == ["auditor", "logician", "chair"]
+    assert all(item["role"] for item in body["solvers"])
+
+
+def test_council_answer_uses_role_prompt(client: TestClient) -> None:
+    body = client.post(
+        "/api/council/answer",
+        json={"model": MOCK_MODEL, "prompt": "Сколько будет 2 + 2?", "expert": "analyst"},
+    ).json()
+    assert body["expert"] == "analyst"
+    assert body["strategy"] == "cot"
+    assert body["answer"] == "Ответ: 42"
+    assert body["reasoning"].startswith("Рассуждаю")
+    request = client.provider.requests[-1]  # type: ignore[attr-defined]
+    assert "Аналитик" in request.messages[0]["content"]
+    assert request.temperature == 0.2
+
+
+def test_council_answer_rejects_unknown_expert(client: TestClient) -> None:
+    response = client.post(
+        "/api/council/answer",
+        json={"model": MOCK_MODEL, "prompt": "2 + 2", "expert": "nobody"},
+    )
+    assert response.status_code == 400
+
+
+def test_council_review_parses_verdicts(monkeypatch) -> None:
+    verdicts = (
+        '{"verdicts": [{"expert": "analyst", "verdict": "ok", "comment": "сходится"},'
+        ' {"expert": "manager", "verdict": "wrong", "comment": "потерял условие"}],'
+        ' "final_answer": "12 фруктов"}'
+    )
+    provider = ScriptedProvider([verdicts])
+    monkeypatch.setattr(main_module, "build_provider", lambda settings, name=None: provider)
+    client = TestClient(main_module.create_app())
+    client.provider = provider  # type: ignore[attr-defined]
+
+    body = client.post(
+        "/api/council/review",
+        json={
+            "model": MOCK_MODEL,
+            "prompt": "Сколько фруктов?",
+            "reviewer": "auditor",
+            "answers": [
+                {"id": "analyst", "label": "Аналитик", "answer": "12"},
+                {"id": "manager", "label": "Менеджер", "answer": "10"},
+            ],
+        },
+    ).json()
+    assert body["parsed"] is True
+    assert body["final_answer"] == "12 фруктов"
+    assert {item["expert"]: item["verdict"] for item in body["verdicts"]} == {
+        "analyst": "ok",
+        "manager": "wrong",
+    }
+    # проверяющий получает задачу и ответы группы
+    user_message = client.provider.requests[-1].messages[-1]["content"]  # type: ignore[attr-defined]
+    assert "id=analyst" in user_message and "id=manager" in user_message
+
+
+def test_council_review_survives_broken_json(monkeypatch) -> None:
+    provider = ScriptedProvider(["не JSON, просто текст"])
+    monkeypatch.setattr(main_module, "build_provider", lambda settings, name=None: provider)
+    client = TestClient(main_module.create_app())
+    client.provider = provider  # type: ignore[attr-defined]
+
+    body = client.post(
+        "/api/council/review",
+        json={
+            "model": MOCK_MODEL,
+            "prompt": "задача",
+            "reviewer": "logician",
+            "answers": [{"id": "analyst", "label": "Аналитик", "answer": "12"}],
+        },
+    ).json()
+    assert body["parsed"] is False
+    assert body["verdicts"] == []
+    assert body["raw_text"]
+
+
 def test_compare_accepts_subset(client: TestClient) -> None:
     response = client.post(
         "/api/compare",

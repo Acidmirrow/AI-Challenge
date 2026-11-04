@@ -66,6 +66,66 @@ class HealthOut(BaseModel):
     config_files: list[str] = []
 
 
+class SolverOut(BaseModel):
+    id: str
+    label: str
+    role: str
+    strategy: str
+    reasoning: str
+    temperature: float
+
+
+class ReviewerOut(BaseModel):
+    id: str
+    label: str
+    role: str
+    reasoning: str
+    temperature: float
+
+
+class CouncilOut(BaseModel):
+    solvers: list[SolverOut]
+    reviewers: list[ReviewerOut]
+
+
+class AnswerRequest(BaseModel):
+    model: str = Field(min_length=1, max_length=128)
+    prompt: str = Field(min_length=1, max_length=8_000)
+    expert: str = Field(min_length=1, max_length=32)
+    max_tokens: int | None = Field(default=1_500, ge=16, le=10_000)
+
+
+class AnswerOut(BaseModel):
+    expert: str
+    label: str
+    strategy: str
+    answer: str = ""
+    reasoning: str = ""
+    usage: dict[str, Any] = {}
+    elapsed_ms: int = 0
+    finish_reason: str | None = None
+    truncated: bool = False
+
+
+class ReviewRequest(BaseModel):
+    model: str = Field(min_length=1, max_length=128)
+    prompt: str = Field(min_length=1, max_length=8_000)
+    reviewer: str = Field(min_length=1, max_length=32)
+    answers: list[dict[str, Any]] = Field(min_length=1, max_length=10)
+    max_tokens: int | None = Field(default=1_500, ge=16, le=10_000)
+
+
+class ReviewOut(BaseModel):
+    reviewer: str
+    label: str
+    verdicts: list[dict[str, Any]] = []
+    final_answer: str = ""
+    parsed: bool = False
+    raw_text: str = ""
+    usage: dict[str, Any] = {}
+    elapsed_ms: int = 0
+
+
 class CompareItem(BaseModel):
     strategy: str
     answer: str = ""

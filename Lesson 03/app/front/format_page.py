@@ -7,7 +7,14 @@ import json
 import httpx
 import streamlit as st
 
-from common import FORMAT_API, REASONING_LABELS, SOURCE_LABELS, nixie_digits, post_stream
+from common import (
+    FORMAT_API,
+    REASONING_LABELS,
+    SOURCE_LABELS,
+    nixie_digits,
+    post_stream,
+    selectable_models,
+)
 
 # Готовые промпты под пресеты схем: одна кнопка — и промпт со схемой согласованы
 PROMPT_TEMPLATES: dict[str, tuple[str, str]] = {
@@ -136,10 +143,14 @@ def render() -> None:
             st.error("API вернул пустой каталог")
             return
 
-        providers = sorted({m["provider"] for m in models}, key=lambda p: (p != "mock", p))
-        source = st.radio("Источник модели", options=providers,
-                          format_func=lambda p: SOURCE_LABELS.get(p, p),
-                          horizontal=True, key="ui_source")
+        models = selectable_models(models)
+        providers = sorted({m["provider"] for m in models})
+        if len(providers) > 1:
+            source = st.radio("Источник модели", options=providers,
+                              format_func=lambda p: SOURCE_LABELS.get(p, p),
+                              horizontal=True, key="ui_source")
+        else:
+            source = providers[0]
         source_models = [m for m in models if m["provider"] == source]
         current = next((m for m in source_models if m["id"] == st.session_state.ui_model),
                        source_models[0])
