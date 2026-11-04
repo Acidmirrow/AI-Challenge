@@ -1,0 +1,37 @@
+name: reasoning-lab
+
+services:
+  api:
+    build: ./api
+    # Конфигурация и токены приходят файлами при деплое.
+    volumes:
+      - ./config:/srv/config:ro
+    ports:
+      - "${API_PORT:-8003}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).status == 200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  front:
+    build: ./front
+    environment:
+      # API урока 03 — в этой же compose-сети; уроки 01 и 02 публикуются на хосте
+      REASONING_API_BASE_URL: http://api:8000
+      CHAT_API_BASE_URL: ${CHAT_API_BASE_URL:-http://host.docker.internal:8000}
+      FORMAT_API_BASE_URL: ${FORMAT_API_BASE_URL:-http://host.docker.internal:8002}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${FRONT_PORT:-8503}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
