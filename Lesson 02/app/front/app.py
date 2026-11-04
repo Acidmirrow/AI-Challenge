@@ -19,7 +19,7 @@ with st.sidebar:
         "Раздел",
         options=["Чат (урок 01)", "Форматы ответа (урок 02)"],
         key="nav_section",
-        help=f"Чат → {CHAT_API}, форматы → {FORMAT_API}",
+        help="Чат ходит в API урока 01, форматы — в API урока 02",
     )
     st.divider()
 

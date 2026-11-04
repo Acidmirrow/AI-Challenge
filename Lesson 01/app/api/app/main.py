@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 import json
 import logging
 import time
@@ -13,7 +14,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from .config import Settings, get_settings
 from .properties import loaded_files
-from .models_catalog import Catalog, ModelInfo, build_catalog
+from .models_catalog import Catalog, ModelInfo, build_catalog, FREE_PROVIDERS, free_models_from
 from .providers import Provider, ProviderError, ProviderRequest, StreamEvent, build_provider
 from .schemas import ChatRequest, HealthOut, ModelOut, SearchBackendOut
 from .search import (
@@ -27,12 +28,49 @@ from .search import (
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("ai-chat.api")
+#: Подписи провайдеров для индикаторов доступности
+PROVIDER_LABELS = {
+    "openai": "OpenAI",
+    "deepseek": "DeepSeek",
+    "gemini": "Gemini",
+    "groq": "Groq",
+    "openrouter": "OpenRouter",
+    "mock": "Демо",
+}
+
+
+async def _load_free_models(settings, catalog) -> None:
+    """Список бесплатных моделей берём из /models провайдера при старте.
+
+    Имена моделей у Gemini/Groq/OpenRouter меняются, поэтому каталог не
+    хардкодим: подключаем те, что реально доступны с этим ключом.
+    """
+    for name in FREE_PROVIDERS:
+        api_key, _ = settings.credentials(name)
+        if not api_key:
+            continue
+        try:
+            remote = await build_provider(settings, name).list_remote_models()
+        except Exception as exc:  # noqa: BLE001 - провайдер просто не подключаем
+            logger.warning("free provider %s недоступен: %s", name, exc)
+            continue
+        models = free_models_from(name, remote)
+        if models:
+            catalog.extend(models)
+            logger.info("free provider %s: %d моделей", name, len(models))
+
 
 def create_app() -> FastAPI:
     settings = get_settings()
     catalog = build_catalog(settings)
 
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        await _load_free_models(settings, catalog)
+        yield
+
     app = FastAPI(
+        lifespan=lifespan,
         title="AI Chat API",
         version="1.0.0",
         description="Streaming chat backend with model / temperature / reasoning controls.",
@@ -102,6 +140,47 @@ def create_app() -> FastAPI:
             web_search=search_label,
             config_files=loaded_files(),
         )
+
+    @app.post("/api/models/refresh")
+    async def refresh_models() -> dict:
+        """Перечитать список бесплатных моделей без перезапуска контейнера."""
+        await _load_free_models(settings, catalog)
+        return {"models": len(catalog.all())}
+
+    @app.get("/api/providers/status")
+    async def providers_status() -> list[dict]:
+        """Живая проверка доступности провайдеров — с кешем на минуту."""
+        now = time.time()
+        cached = getattr(app.state, "provider_status", None)
+        if cached and now - cached["at"] < 60:
+            return cached["data"]
+
+        names = [settings.provider] if settings.provider != "mock" else []
+        names += [name for name in FREE_PROVIDERS if name not in names]
+        rows: list[dict] = []
+        for name in names:
+            api_key, _ = settings.credentials(name)
+            row = {
+                "provider": name,
+                "label": PROVIDER_LABELS.get(name, name.title()),
+                "configured": bool(api_key),
+                "available": False,
+                "models": sum(1 for model in catalog.all() if model.provider == name),
+                "latency_ms": 0,
+                "error": "",
+            }
+            if api_key and name != "mock":
+                started = time.perf_counter()
+                try:
+                    await build_provider(settings, name).list_remote_models()
+                    row["available"] = True
+                except Exception as exc:  # noqa: BLE001 - статус и есть ответ
+                    row["error"] = str(exc)[:200]
+                row["latency_ms"] = int((time.perf_counter() - started) * 1000)
+            rows.append(row)
+
+        app.state.provider_status = {"at": now, "data": rows}
+        return rows
 
     @app.get("/api/models", response_model=list[ModelOut])
     async def models() -> list[ModelOut]:

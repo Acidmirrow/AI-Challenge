@@ -7,7 +7,14 @@ import json
 import httpx
 import streamlit as st
 
-from common import FORMAT_API, REASONING_LABELS, SOURCE_LABELS, nixie_digits, post_stream
+from common import (
+    FORMAT_API,
+    REASONING_LABELS,
+    SOURCE_LABELS,
+    nixie_digits,
+    post_stream,
+    provider_badges,
+)
 
 # Готовые промпты под пресеты схем: одна кнопка — и промпт со схемой согласованы
 PROMPT_TEMPLATES: dict[str, tuple[str, str]] = {
@@ -51,13 +58,14 @@ INSTRUCTION_TEMPLATES: dict[str, str] = {
 
 @st.cache_data(ttl=30, show_spinner=False)
 def load_format_backend() -> dict:
-    result: dict = {"health": None, "formats": [], "models": [], "presets": [], "error": None}
+    result: dict = {"health": None, "models": [], "formats": [], "presets": {}, "providers": [], "error": None}
     try:
         with httpx.Client(timeout=10.0) as client:
             result["health"] = client.get(f"{FORMAT_API}/api/health").json()
             result["formats"] = client.get(f"{FORMAT_API}/api/formats").json()
             result["models"] = client.get(f"{FORMAT_API}/api/models").json()
             result["presets"] = client.get(f"{FORMAT_API}/api/presets").json()
+            result["providers"] = client.get(f"{FORMAT_API}/api/providers/status").json()
     except Exception as exc:  # noqa: BLE001
         result["error"] = f"{type(exc).__name__}: {exc}"
     return result
@@ -123,14 +131,10 @@ def render() -> None:
         if backend["error"]:
             st.error("API урока 02 недоступен")
             st.caption(backend["error"])
-            st.caption(f"Адрес: `{FORMAT_API}`")
             return
 
-        health = backend["health"] or {}
-        name = health.get("provider", "").partition(" @ ")[0] or "—"
         st.markdown(
-            f'<div class="provider-badge">{"🟢" if health.get("status") == "ok" else "🟠"} <b>{name}</b></div>',
-            unsafe_allow_html=True,
+            provider_badges(backend.get("providers") or []), unsafe_allow_html=True
         )
         if not models or not formats:
             st.error("API вернул пустой каталог")

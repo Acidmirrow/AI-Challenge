@@ -37,6 +37,7 @@ BASE_CSS = f"""
       .brand-sub {{ font-size: .62rem; letter-spacing: .18em; text-transform: uppercase; opacity: .42;
                     margin: 0 0 .55rem 0; }}
       .provider-badge {{ font-size: .8rem; opacity: .85; margin: -.1rem 0 .35rem 0; cursor: default; }}
+      .prov-chip {{ margin-right: .7rem; white-space: nowrap; }}
       [data-testid="stPopover"] button[data-testid="stPopoverButton"] {{
           width: 100%; justify-content: center; font-weight: 600;
           background: linear-gradient(180deg, #8b6bff, #6f4ae6) !important; color: #fff !important;
@@ -121,3 +122,30 @@ def nixie_digits(text: str) -> str:
         else:
             cells.append(f'<span class="tube"><span class="glow">{char}</span></span>')
     return f'<div class="nixie">{"".join(cells)}</div>'
+
+PROVIDER_LABELS = {
+    "mock": "Демо",
+    "deepseek": "DeepSeek",
+    "openai": "OpenAI",
+    "gemini": "Gemini",
+    "groq": "Groq",
+    "openrouter": "OpenRouter",
+}
+
+
+def provider_badges(rows: list[dict]) -> str:
+    """Индикаторы доступности: 🟢 отвечает, 🟠 не отвечает, ⚪ ключа нет."""
+    chips = []
+    for row in rows or []:
+        name = row.get("provider") or ""
+        label = PROVIDER_LABELS.get(name, name.title() or "—").split(" · ")[0].removesuffix(" API")
+        if not row.get("configured"):
+            dot, hint = "⚪", "ключ не настроен"
+        elif row.get("available"):
+            dot = "🟢"
+            hint = f"{row.get('models', 0)} моделей · {row.get('latency_ms', 0)} мс"
+        else:
+            dot, hint = "🟠", row.get("error") or "нет ответа"
+        chips.append(f'<span class="prov-chip" title="{hint}">{dot} {label}</span>')
+    return f'<div class="provider-badge">{"".join(chips)}</div>' if chips else ""
+

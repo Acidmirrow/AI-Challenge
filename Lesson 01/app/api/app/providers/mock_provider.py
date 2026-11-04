@@ -29,6 +29,10 @@ class MockProvider(Provider):
                 yield StreamEvent("reasoning", text=piece)
 
         answer = self._answer(request, question)
+        # как настоящий провайдер: не отдаём больше бюджета, чем разрешено
+        budget_chars = (request.max_tokens or 10_000) * 4
+        truncated = len(answer) > budget_chars
+        answer = answer[:budget_chars]
         async for piece in self._chunks(answer, 4):
             yield StreamEvent("delta", text=piece)
             await asyncio.sleep(self.chunk_delay_s)
@@ -40,6 +44,7 @@ class MockProvider(Provider):
                 "elapsed_ms": int((time.perf_counter() - started) * 1000),
                 "prompt_tokens": sum(len(m["content"]) for m in request.messages) // 4,
                 "completion_tokens": (len(answer) + reasoning_chars) // 4,
+                "finish_reason": "length" if truncated else "stop",
                 "mock": True,
             },
         )

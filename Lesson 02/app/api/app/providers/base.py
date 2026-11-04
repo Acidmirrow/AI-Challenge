@@ -51,5 +51,9 @@ class Provider(ABC):
         """Асинхронный генератор: delta/tool_delta … и одно событие done."""
         raise NotImplementedError
 
+    async def list_remote_models(self) -> list[str]:
+        """Модели, доступные провайдеру (по умолчанию — пусто)."""
+        return []
+
     async def close(self) -> None:  # pragma: no cover - опционально
         return None

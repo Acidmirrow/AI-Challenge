@@ -41,5 +41,9 @@ class Provider(ABC):
         raise NotImplementedError
 
 
+    async def list_remote_models(self) -> list[str]:
+        """Models the provider serves (empty by default)."""
+        return []
+
     async def close(self) -> None:  # pragma: no cover - optional cleanup
         return None

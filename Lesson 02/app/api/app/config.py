@@ -42,6 +42,15 @@ class Settings(BaseSettings):
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com/v1"
 
+    # Бесплатные провайдеры с OpenAI-совместимым API (ключ выдаётся без карты).
+    gemini_api_key: str = ""
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    groq_api_key: str = ""
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+    openrouter_api_key: str = ""
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+
+
     # Name of the parameter used to control reasoning depth.
     # OpenAI: reasoning_effort. Set to "" for gateways that reject unknown params.
     reasoning_param: str = "reasoning_effort"
@@ -68,6 +77,17 @@ class Settings(BaseSettings):
 
     http_timeout_s: float = 180.0
     cors_origins: str = "*"
+
+    def credentials(self, provider: str) -> tuple[str, str]:
+        """Ключ и base_url для конкретного провайдера."""
+        mapping = {
+            "openai": (self.openai_api_key, self.openai_base_url),
+            "deepseek": (self.deepseek_api_key, self.deepseek_base_url),
+            "gemini": (self.gemini_api_key, self.gemini_base_url),
+            "groq": (self.groq_api_key, self.groq_base_url),
+            "openrouter": (self.openrouter_api_key, self.openrouter_base_url),
+        }
+        return mapping.get(provider, ("", ""))
 
     @property
     def api_key(self) -> str:

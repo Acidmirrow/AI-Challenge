@@ -13,7 +13,13 @@ from app.providers.openai_provider import OpenAIProvider
 
 
 def settings(**overrides) -> Settings:
-    base = {"provider": "openai", "openai_api_key": "sk-test", "openai_base_url": "https://example.test/v1"}
+    base = {
+        "provider": "openai",
+        "openai_api_key": "sk-test",
+        "openai_base_url": "https://example.test/v1",
+        # изолируемся от config/app.properties: там max.tokens.param=max_tokens
+        "max_tokens_param": "",
+    }
     return Settings(**{**base, **overrides})
 
 
@@ -83,6 +89,6 @@ def test_degraded_health_and_503_when_key_missing(monkeypatch: pytest.MonkeyPatc
             json={"model": "gpt-5", "messages": [{"role": "user", "content": "hi"}]},
         )
         assert response.status_code == 503
-        assert "OPENAI_API_KEY" in response.json()["detail"]
+        assert "openai.api.key" in response.json()["detail"]
     finally:
         get_settings.cache_clear()

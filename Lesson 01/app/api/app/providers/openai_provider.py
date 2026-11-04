@@ -16,18 +16,21 @@ class OpenAIProvider(Provider):
 
     name = "openai"
 
-    def __init__(self, settings: Settings):
-        if not settings.api_key:
-            key_name = "DEEPSEEK_API_KEY" if settings.provider == "deepseek" else "OPENAI_API_KEY"
+    def __init__(self, settings: Settings, name: str = ""):
+        self.name = name or settings.provider
+        api_key, base_url = settings.credentials(self.name)
+        if not api_key:
             raise ProviderError(
-                f"{key_name} не задан. Добавь ключ в .env и перезапусти контейнер api.",
+                f"Не задан ключ `{self.name}.api.key`. Добавь его в config/secrets.properties "
+                "и перезапусти контейнер api.",
                 kind="not_configured",
                 status=503,
             )
         self._settings = settings
+        self._base_url = base_url
         self._client = AsyncOpenAI(
-            api_key=settings.api_key,
-            base_url=settings.base_url,
+            api_key=api_key,
+            base_url=base_url,
             timeout=settings.http_timeout_s,
         )
 
@@ -68,13 +71,14 @@ class OpenAIProvider(Provider):
     async def stream(self, request: ProviderRequest) -> AsyncIterator[StreamEvent]:
         started = time.perf_counter()
         usage: dict = {}
+        finish_reason: str | None = None
         try:
             stream = await self._client.chat.completions.create(**self._kwargs(request))
         except openai.APIStatusError as exc:  # 4xx/5xx from the upstream API
             raise ProviderError(_humanize(exc), kind=_kind(exc), status=502) from exc
         except openai.APIConnectionError as exc:
             raise ProviderError(
-                f"Нет соединения с {self._settings.base_url}: {exc}", kind="connection"
+                f"Нет соединения с {self._base_url}: {exc}", kind="connection"
             ) from exc
 
         try:
@@ -87,6 +91,8 @@ class OpenAIProvider(Provider):
                     }
                 if not getattr(chunk, "choices", None):
                     continue
+                if chunk.choices[0].finish_reason:
+                    finish_reason = chunk.choices[0].finish_reason
                 delta = chunk.choices[0].delta
                 reasoning = _reasoning_text(delta)
                 if reasoning:
@@ -101,14 +107,15 @@ class OpenAIProvider(Provider):
             data={
                 "model": request.model,
                 "elapsed_ms": int((time.perf_counter() - started) * 1000),
+                "finish_reason": finish_reason,
                 **usage,
             },
         )
 
     # -- optional model discovery --------------------------------------------
     async def list_remote_models(self) -> list[str]:
-        url = self._settings.base_url.rstrip("/") + "/models"
-        headers = {"Authorization": f"Bearer {self._settings.api_key}"}
+        url = self._base_url.rstrip("/") + "/models"
+        headers = {"Authorization": f"Bearer {self._client.api_key}"}
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(url, headers=headers)
             response.raise_for_status()

@@ -26,21 +26,23 @@ class MockProvider(Provider):
         budget_chars = (request.max_tokens or 1024) * 4
 
         if uses_tools:
-            payload = json.dumps(self._sample(request.schema or {}), ensure_ascii=False)[:budget_chars]
-            async for piece in self._chunks(payload, 12):
+            full = json.dumps(self._sample(request.schema or {}), ensure_ascii=False)
+            text = full[:budget_chars]
+            async for piece in self._chunks(text, 12):
                 yield StreamEvent("tool_delta", text=piece)
-            finish = "tool_calls"
-            text = ""
+            finish = "length" if len(full) > budget_chars else "tool_calls"
         elif is_json:
-            text = json.dumps(self._sample(request.schema or {}), ensure_ascii=False, indent=2)[:budget_chars]
+            full = json.dumps(self._sample(request.schema or {}), ensure_ascii=False, indent=2)
+            text = full[:budget_chars]
             async for piece in self._chunks(text, 12):
                 yield StreamEvent("delta", text=piece)
-            finish = "stop"
+            finish = "length" if len(full) > budget_chars else "stop"
         else:
-            text = self._prose(request)[:budget_chars]
+            full = self._prose(request)
+            text = full[:budget_chars]
             async for piece in self._chunks(text, 8):
                 yield StreamEvent("delta", text=piece)
-            finish = "stop"
+            finish = "length" if len(full) > budget_chars else "stop"
 
         yield StreamEvent(
             "done",

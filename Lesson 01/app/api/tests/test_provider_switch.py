@@ -67,7 +67,7 @@ def test_real_model_without_key_returns_503(app_without_key: TestClient) -> None
         json={"model": "deepseek-flash", "messages": [{"role": "user", "content": "hi"}]},
     )
     assert response.status_code == 503
-    assert "DEEPSEEK_API_KEY" in response.json()["detail"]
+    assert "deepseek.api.key" in response.json()["detail"]
 
 
 def test_health_reports_primary_provider(app_without_key: TestClient) -> None:

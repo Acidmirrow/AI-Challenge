@@ -81,6 +81,62 @@ CATALOGS = {
     "deepseek": DEEPSEEK_MODELS,
 }
 
+#: Провайдеры с бесплатным тарифом и правило отбора моделей из их /models
+FREE_PROVIDER_RULES: dict[str, dict] = {
+    "gemini": {
+        "include": ("gemini-",),
+        "exclude": ("embedding", "embed", "tts", "image", "imagen", "veo", "live"),
+        "limit": 3,
+    },
+    "groq": {
+        "include": ("llama", "gpt-oss", "qwen", "kimi"),
+        "exclude": ("whisper", "tts", "guard", "embed", "distil"),
+        "limit": 3,
+    },
+    "openrouter": {
+        "include": (":free",),
+        "exclude": ("embedding",),
+        "limit": 3,
+    },
+}
+
+FREE_PROVIDERS = tuple(FREE_PROVIDER_RULES)
+
+
+def free_models_from(provider: str, remote_ids: list[str]) -> list[ModelInfo]:
+    """Отобрать бесплатные модели провайдера из его собственного /models."""
+    rule = FREE_PROVIDER_RULES.get(provider)
+    if not rule:
+        return []
+    picked: list[str] = []
+    for model_id in sorted(set(remote_ids), key=lambda value: (len(value), value)):
+        low = model_id.lower()
+        if not any(token in low for token in rule["include"]):
+            continue
+        if any(token in low for token in rule["exclude"]):
+            continue
+        picked.append(model_id)
+        if len(picked) >= rule["limit"]:
+            break
+    return [
+        ModelInfo(
+            model_id,
+            f"{_short_name(model_id)} (free)",
+            description=f"Бесплатный тариф {provider}",
+            provider=provider,
+            supports_json_schema=False,
+        )
+        for model_id in picked
+    ]
+
+
+def _short_name(model_id: str) -> str:
+    """Человекочитаемое имя: путь и суффикс :free убираем."""
+    name = model_id.split("/")[-1].removesuffix(":free")
+    return name.replace("-", " ").replace("_", " ").title()
+
+
+
 
 def _from_file(path: str, default_provider: str) -> list[ModelInfo]:
     raw = json.loads(Path(path).read_text(encoding="utf-8"))

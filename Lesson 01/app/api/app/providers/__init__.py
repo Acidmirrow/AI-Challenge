@@ -14,25 +14,27 @@ __all__ = [
 ]
 
 
-def build_provider(settings: Settings, name: str | None = None) -> Provider:
-    """Build the provider for ``name`` (defaults to the configured one).
+#: OpenAI-совместимые провайдеры; gemini/groq/openrouter — бесплатные тарифы
+OPENAI_COMPATIBLE = ("openai", "deepseek", "gemini", "groq", "openrouter")
 
-    ``mock`` is always available — that is what lets the UI switch between the
-    offline demo and the real API from a single deployment.
-    """
+
+def build_provider(settings: Settings, name: str | None = None) -> Provider:
+    """Провайдер по имени модели: нужен только его ключ, основной профиль не помеха."""
     name = name or settings.provider
     if name == "mock":
         return MockProvider()
-    if name in ("openai", "deepseek"):
-        if name != settings.provider:
+    if name in OPENAI_COMPATIBLE:
+        api_key, _ = settings.credentials(name)
+        if not api_key:
             raise ProviderError(
-                f"Профиль {name!r} не настроен: в .env указан PROVIDER={settings.provider}.",
-                kind="config",
+                f"Провайдер {name!r} не настроен: нет ключа `{name}.api.key` "
+                "в config/secrets.properties.",
+                kind="not_configured",
                 status=503,
             )
-        return OpenAIProvider(settings)
+        return OpenAIProvider(settings, name)
     raise ProviderError(
-        f"Неизвестный провайдер {name!r}. Допустимо: mock, openai, deepseek.",
+        f"Неизвестный провайдер {name!r}. Допустимо: mock, openai, deepseek, gemini, groq, openrouter.",
         kind="config",
         status=500,
     )

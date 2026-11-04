@@ -29,7 +29,31 @@ REASONING_LABELS = {
     "ultra": "Ультра",
     "max": "Максимальный",
 }
-SOURCE_LABELS = {"mock": "Демо (mock)", "deepseek": "DeepSeek API", "openai": "OpenAI API"}
+SOURCE_LABELS = {
+    "mock": "Демо (mock)",
+    "deepseek": "DeepSeek API",
+    "openai": "OpenAI API",
+    "gemini": "Gemini",
+    "groq": "Groq",
+    "openrouter": "OpenRouter",
+}
+
+
+def provider_chips(rows: list[dict]) -> str:
+    """Индикаторы доступности: 🟢 отвечает, 🟠 не отвечает, ⚪ ключа нет."""
+    chips = []
+    for row in rows or []:
+        name = row.get("provider") or ""
+        label = SOURCE_LABELS.get(name, name.title()).removesuffix(" API").removesuffix(" (mock)")
+        if not row.get("configured"):
+            dot, hint = "⚪", "ключ не настроен"
+        elif row.get("available"):
+            dot = "🟢"
+            hint = f"{row.get('models', 0)} моделей · {row.get('latency_ms', 0)} мс"
+        else:
+            dot, hint = "🟠", row.get("error") or "нет ответа"
+        chips.append(f'<span class="prov-chip" title="{hint}">{dot} {label}</span>')
+    return f'<div class="provider-badge">{"".join(chips)}</div>' if chips else ""
 EXAMPLE_PROMPTS = [
     "Объясни разницу между RAG и fine-tuning",
     "Напиши SQL-запрос: топ-5 клиентов по выручке",
@@ -68,6 +92,7 @@ st.markdown(
       /* status badge: provider name only, never a link */
       .provider-badge {{ font-size: .8rem; opacity: .85; margin: -.15rem 0 .35rem 0; cursor: default; }}
       .provider-badge b {{ font-weight: 600; }}
+      .prov-chip {{ margin-right: .7rem; white-space: nowrap; }}
 
       /* ---------- Nixie readout ---------- */
       .nixie {{ display: flex; gap: 6px; margin: .05rem 0 .55rem 0;
@@ -126,12 +151,13 @@ st.markdown(
 @st.cache_data(ttl=30, show_spinner=False)
 def load_backend() -> dict:
     """Models + health in one shot; cached so the sidebar is cheap to render."""
-    result: dict = {"models": [], "health": None, "search_backends": [], "error": None}
+    result: dict = {"models": [], "health": None, "search_backends": [], "providers": [], "error": None}
     try:
         with httpx.Client(timeout=10.0) as client:
             result["health"] = client.get(f"{API_BASE}/api/health").json()
             result["models"] = client.get(f"{API_BASE}/api/models").json()
             result["search_backends"] = client.get(f"{API_BASE}/api/search/backends").json()
+            result["providers"] = client.get(f"{API_BASE}/api/providers/status").json()
     except Exception as exc:  # noqa: BLE001 - surfaced in the sidebar
         result["error"] = f"{type(exc).__name__}: {exc}"
     return result
@@ -279,6 +305,7 @@ def run_turn(cfg: dict) -> None:
     started = time.perf_counter()
     answer, reasoning = "", ""
     meta, error = "", None
+    finish_reason = None
     sources: list[dict] = []
     search_backend = ""
 
@@ -322,6 +349,9 @@ def run_turn(cfg: dict) -> None:
                 )
                 if tokens:
                     meta += f" · {tokens} tok"
+                finish_reason = data.get("finish_reason")
+                if finish_reason == "length":
+                    meta += " · ⚠️ обрезано по max_tokens"
             elif event == "error":
                 error = data.get("message", "неизвестная ошибка")
 
@@ -344,6 +374,11 @@ def run_turn(cfg: dict) -> None:
             "failed": bool(error),
         }
     )
+    if finish_reason == "length":
+        st.error(
+            f"Ответ не уместился в лимит max_tokens = {payload['max_tokens']} — текст оборван. "
+            "Увеличьте «Max tokens» и повторите запрос."
+        )
     if error:
         st.toast(error, icon="⚠️")
 
@@ -381,17 +416,10 @@ with st.sidebar:
     if backend["error"]:
         st.error("API недоступен")
         st.caption(backend["error"])
-        st.caption(f"Ожидаемый адрес: `{API_BASE}`")
         st.stop()
 
     health = backend["health"] or {}
-    # "deepseek @ https://api.deepseek.com/v1" → just the provider name
-    name = health.get("provider", "").partition(" @ ")[0] or "—"
-    status_dot = "🟢" if health.get("status") == "ok" else "🟠"
-    st.markdown(
-        f'<div class="provider-badge">{status_dot} <b>{name}</b></div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(provider_chips(backend.get("providers") or []), unsafe_allow_html=True)
     if health.get("status") != "ok":
         st.warning(health.get("detail", "Провайдер не настроен"))
 
