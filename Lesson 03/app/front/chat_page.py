@@ -18,6 +18,7 @@ from common import (
     SOURCE_LABELS,
     nixie_digits,
     post_stream,
+    provider_badges,
 )
 
 EXAMPLE_PROMPTS = [
@@ -29,12 +30,13 @@ EXAMPLE_PROMPTS = [
 
 @st.cache_data(ttl=20, show_spinner=False)
 def load_chat_backend() -> dict:
-    result: dict = {"models": [], "health": None, "search_backends": [], "error": None}
+    result: dict = {"models": [], "health": None, "search_backends": [], "providers": [], "error": None}
     try:
         with httpx.Client(timeout=10.0) as client:
             result["health"] = client.get(f"{CHAT_API}/api/health").json()
             result["models"] = client.get(f"{CHAT_API}/api/models").json()
             result["search_backends"] = client.get(f"{CHAT_API}/api/search/backends").json()
+            result["providers"] = client.get(f"{CHAT_API}/api/providers/status").json()
     except Exception as exc:  # noqa: BLE001
         result["error"] = f"{type(exc).__name__}: {exc}"
     return result
@@ -107,6 +109,7 @@ def _run_turn(cfg: dict) -> None:
     }
     started = time.perf_counter()
     answer, reasoning, meta, error = "", "", "", None
+    finish_reason = None
     sources: list[dict] = []
     search_backend = ""
 
@@ -146,10 +149,18 @@ def _run_turn(cfg: dict) -> None:
                         f"reasoning {payload['reasoning']} · {elapsed} ms")
                 if tokens:
                     meta += f" · {tokens} tok"
+                finish_reason = data.get("finish_reason")
+                if finish_reason == "length":
+                    meta += " · ⚠️ обрезано по max_tokens"
             elif event == "error":
                 error = data.get("message", "неизвестная ошибка")
 
         answer_slot.error(error) if error else answer_slot.markdown(answer)
+        if finish_reason == "length":
+            st.error(
+                f"Ответ не уместился в лимит max_tokens = {payload['max_tokens']} — текст оборван. "
+                "Увеличьте «Max tokens» и повторите запрос."
+            )
         if meta:
             meta_slot.markdown(f'<div class="meta-line">{meta}</div>', unsafe_allow_html=True)
 
@@ -181,14 +192,11 @@ def render() -> None:
         if backend["error"]:
             st.error("API урока 01 недоступен")
             st.caption(backend["error"])
-            st.caption(f"Адрес: `{CHAT_API}`")
             return
 
         health = backend["health"] or {}
-        name = health.get("provider", "").partition(" @ ")[0] or "—"
         st.markdown(
-            f'<div class="provider-badge">{"🟢" if health.get("status") == "ok" else "🟠"} <b>{name}</b></div>',
-            unsafe_allow_html=True,
+            provider_badges(backend.get("providers") or []), unsafe_allow_html=True
         )
         if not models:
             st.error("API вернул пустой список моделей")

@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import time
+from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException
@@ -20,11 +21,13 @@ from .council import (
     parse_review,
     review_messages,
 )
-from .models_catalog import ModelInfo, build_catalog
+from .models_catalog import FREE_PROVIDERS, ModelInfo, build_catalog, free_models_from
 from .properties import loaded_files
 from .providers import Provider, ProviderError, ProviderRequest, build_provider
 from .schemas import (
     AnswerOut,
+    CrossCheckOut,
+    CrossCheckRequest,
     AnswerRequest,
     ChatRequest,
     CompareRequest,
@@ -41,16 +44,53 @@ from .strategies import STRATEGIES, STRATEGIES_BY_ID, Strategy, get_strategy, sp
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("reasoning-lab.api")
+#: Подписи провайдеров для индикаторов доступности
+PROVIDER_LABELS = {
+    "openai": "OpenAI",
+    "deepseek": "DeepSeek",
+    "gemini": "Gemini",
+    "groq": "Groq",
+    "openrouter": "OpenRouter",
+    "mock": "Демо",
+}
+
+
+
+async def _load_free_models(settings, catalog) -> None:
+    """Список бесплатных моделей берём из /models провайдера при старте.
+
+    Имена моделей у Gemini/Groq/OpenRouter меняются, поэтому каталог не
+    хардкодим: подключаем те, что реально доступны с этим ключом.
+    """
+    for name in FREE_PROVIDERS:
+        api_key, _ = settings.credentials(name)
+        if not api_key:
+            continue
+        try:
+            remote = await build_provider(settings, name).list_remote_models()
+        except Exception as exc:  # noqa: BLE001 - провайдер просто не подключаем
+            logger.warning("free provider %s недоступен: %s", name, exc)
+            continue
+        models = free_models_from(name, remote)
+        if models:
+            catalog.extend(models)
+            logger.info("free provider %s: %d моделей", name, len(models))
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
     catalog = build_catalog(settings)
 
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        await _load_free_models(settings, catalog)
+        yield
+
     app = FastAPI(
         title="AI Reasoning Lab",
         version="1.0.0",
         description="Урок 03: способы рассуждений — от прямого ответа до CoT и самопроверки.",
+        lifespan=lifespan,
     )
     app.add_middleware(
         CORSMiddleware,
@@ -97,6 +137,127 @@ def create_app() -> FastAPI:
             strategies=len(STRATEGIES),
             config_files=loaded_files(),
         )
+
+    @app.post("/api/models/refresh")
+    async def refresh_models() -> dict:
+        """Перечитать список бесплатных моделей без перезапуска контейнера."""
+        await _load_free_models(settings, catalog)
+        return {"models": len(catalog.all())}
+
+    @app.get("/api/providers/status")
+    async def providers_status() -> list[dict]:
+        """Живая проверка доступности провайдеров — с кешем на минуту."""
+        now = time.time()
+        cached = getattr(app.state, "provider_status", None)
+        if cached and now - cached["at"] < 60:
+            return cached["data"]
+
+        names = [settings.provider] if settings.provider != "mock" else []
+        names += [name for name in FREE_PROVIDERS if name not in names]
+        rows: list[dict] = []
+        for name in names:
+            api_key, _ = settings.credentials(name)
+            row = {
+                "provider": name,
+                "label": PROVIDER_LABELS.get(name, name.title()),
+                "configured": bool(api_key),
+                "available": False,
+                "models": sum(1 for model in catalog.all() if model.provider == name),
+                "latency_ms": 0,
+                "error": "",
+            }
+            if api_key and name != "mock":
+                started = time.perf_counter()
+                try:
+                    await build_provider(settings, name).list_remote_models()
+                    row["available"] = True
+                except Exception as exc:  # noqa: BLE001 - статус и есть ответ
+                    row["error"] = str(exc)[:200]
+                row["latency_ms"] = int((time.perf_counter() - started) * 1000)
+            rows.append(row)
+
+        app.state.provider_status = {"at": now, "data": rows}
+        return rows
+
+    @app.post("/api/cross-check", response_model=CrossCheckOut)
+    async def cross_check(payload: CrossCheckRequest) -> CrossCheckOut:
+        """Модель A отвечает, модель B проверяет ответ — без ролей совета экспертов."""
+        solver_model = _model(app, payload.solver_model)
+        reviewer_model = _model(app, payload.reviewer_model)
+        strategy = get_strategy("cot")
+
+        started = time.perf_counter()
+        raw, native, finish_reason, usage = await _collect(
+            provider(solver_model.provider),
+            ProviderRequest(
+                messages=[
+                    {"role": "system", "content": strategy.system_prompt},
+                    {"role": "user", "content": payload.prompt},
+                ],
+                model=solver_model.id,
+                temperature=payload.temperature if solver_model.supports_temperature else None,
+                reasoning=_soft_reasoning(solver_model, payload.solver_reasoning),
+                max_tokens=payload.max_tokens,
+                supports_reasoning=solver_model.supports_reasoning,
+                supports_temperature=solver_model.supports_temperature,
+            ),
+        )
+        head, answer_text = split_answer(strategy, raw)
+        answer = AnswerOut(
+            expert="solver",
+            label=solver_model.label,
+            strategy=strategy.id,
+            answer=answer_text or raw.strip(),
+            reasoning=head or native,
+            usage=usage,
+            elapsed_ms=int((time.perf_counter() - started) * 1000),
+            finish_reason=finish_reason,
+            truncated=finish_reason == "length",
+        )
+
+        reviewer = REVIEWERS_BY_ID.get("auditor") or REVIEWERS[0]
+        review_started = time.perf_counter()
+        messages = [
+            {
+                "role": "system",
+                "content": reviewer.system_prompt(
+                    [{"id": "solver", "label": f"{solver_model.label} ({solver_model.id})"}]
+                )
+                + (
+                    "\n\nВажно: если итог совпал с правильным, но шаги решения в ответе "
+                    'не показаны — ставь verdict "unclear", а не "wrong".'
+                ),
+            },
+            *review_messages(
+                payload.prompt,
+                [{"expert": "solver", "label": solver_model.label, "answer": answer.answer}],
+            ),
+        ]
+        review_raw, _, review_finish, review_usage = await _collect(
+            provider(reviewer_model.provider),
+            ProviderRequest(
+                messages=messages,
+                model=reviewer_model.id,
+                temperature=reviewer.temperature if reviewer_model.supports_temperature else None,
+                reasoning=_soft_reasoning(reviewer_model, payload.reviewer_reasoning),
+                max_tokens=payload.max_tokens,
+                supports_reasoning=reviewer_model.supports_reasoning,
+                supports_temperature=reviewer_model.supports_temperature,
+            ),
+        )
+        parsed = parse_review(review_raw, ["solver"])
+        review = ReviewOut(
+            reviewer=reviewer.id,
+            label=reviewer_model.label,
+            verdicts=parsed["verdicts"],
+            final_answer=parsed["final_answer"],
+            parsed=parsed["parsed"],
+            raw_text=review_raw,
+            usage=review_usage,
+            elapsed_ms=int((time.perf_counter() - review_started) * 1000),
+            finish_reason=review_finish,
+        )
+        return CrossCheckOut(requirement=payload.requirement, answer=answer, review=review)
 
     @app.get("/api/models", response_model=list[ModelOut])
     async def models() -> list[ModelOut]:
@@ -250,12 +411,31 @@ def create_app() -> FastAPI:
             raw_text=raw.strip(),
             usage=usage,
             elapsed_ms=int((time.perf_counter() - started) * 1000),
+            finish_reason=finish_reason,
         )
 
     return app
 
 
-# -- helpers ------------------------------------------------------------------
+
+async def _collect(active: Provider, request: ProviderRequest) -> tuple[str, str, str | None, dict]:
+    """Слить поток провайдера в текст: (ответ, reasoning, finish_reason, usage)."""
+    raw, native, finish_reason, usage = "", "", None, {}
+    async for event in active.stream(request):
+        if event.type == "reasoning":
+            native += event.text
+        elif event.type == "delta":
+            raw += event.text
+        elif event.type == "done":
+            finish_reason = event.data.get("finish_reason")
+            usage = {
+                key: event.data[key]
+                for key in ("prompt_tokens", "completion_tokens", "total_tokens")
+                if key in event.data
+            }
+    return raw, native, finish_reason, usage
+
+
 def _model(app: FastAPI, model_id: str) -> ModelInfo:
     model = app.state.catalog.get(model_id)
     if model is None:

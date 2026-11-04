@@ -86,6 +86,40 @@ def test_health_reports_strategies(client: TestClient) -> None:
     assert body["strategies"] == len(STRATEGIES)
 
 
+def test_free_models_picked_from_remote_list() -> None:
+    from app.models_catalog import free_models_from
+
+    gemini = free_models_from("gemini", [
+        "gemini-2.5-flash", "gemini-2.5-pro", "text-embedding-004", "gemini-2.0-flash-tts",
+    ])
+    assert [model.id for model in gemini] == ["gemini-2.5-pro", "gemini-2.5-flash"]
+
+    groq = free_models_from("groq", [
+        "llama-3.3-70b-versatile", "whisper-large-v3", "openai/gpt-oss-120b",
+    ])
+    assert {model.id for model in groq} == {"llama-3.3-70b-versatile", "openai/gpt-oss-120b"}
+
+    openrouter = free_models_from("openrouter", [
+        "deepseek/deepseek-chat-v3-0324:free", "openai/gpt-4.1", "meta-llama/llama-3.3-70b-instruct:free",
+    ])
+    assert {model.id for model in openrouter} == {
+        "deepseek/deepseek-chat-v3-0324:free", "meta-llama/llama-3.3-70b-instruct:free",
+    }
+    assert all(model.provider == "openrouter" for model in openrouter)
+
+
+def test_free_provider_uses_its_own_endpoint() -> None:
+    from app.config import Settings
+    from app.providers import build_provider
+    from app.providers.openai_provider import OpenAIProvider
+
+    settings = Settings(provider="deepseek", deepseek_api_key="k", gemini_api_key="g")
+    provider = build_provider(settings, "gemini")
+    assert isinstance(provider, OpenAIProvider)
+    assert provider.name == "gemini"
+    assert "generativelanguage.googleapis.com" in str(provider._client.base_url)
+
+
 def test_models_have_providers(client: TestClient) -> None:
     models = client.get("/api/models").json()
     assert {m["id"] for m in models} >= {"mock-fast", "mock-reasoner"}
@@ -277,6 +311,44 @@ def test_council_review_survives_broken_json(monkeypatch) -> None:
     assert body["parsed"] is False
     assert body["verdicts"] == []
     assert body["raw_text"]
+
+
+MOCK_SOLVER = "mock-fast"
+MOCK_REVIEWER = "mock-reasoner"
+
+
+def test_cross_check_answers_then_reviews(client: TestClient) -> None:
+    response = client.post(
+        "/api/cross-check",
+        json={
+            "prompt": "Сколько будет 17 × 4?",
+            "requirement": "extra low",
+            "solver_model": MOCK_SOLVER,
+            "reviewer_model": MOCK_REVIEWER,
+            "max_tokens": 400,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["requirement"] == "extra low"
+    assert body["answer"]["label"]
+    assert body["answer"]["answer"]
+    assert body["review"]["label"]
+    assert body["review"]["raw_text"]
+    # mock не отвечает JSON по схеме — разбор честно помечается как неудачный
+    assert body["review"]["parsed"] is False
+
+
+def test_cross_check_rejects_unknown_model(client: TestClient) -> None:
+    response = client.post(
+        "/api/cross-check",
+        json={
+            "prompt": "2 + 2",
+            "solver_model": "нет-такой-модели",
+            "reviewer_model": MOCK_REVIEWER,
+        },
+    )
+    assert response.status_code == 400
 
 
 def test_compare_accepts_subset(client: TestClient) -> None:

@@ -124,6 +124,26 @@ class ReviewOut(BaseModel):
     raw_text: str = ""
     usage: dict[str, Any] = {}
     elapsed_ms: int = 0
+    finish_reason: str | None = None
+
+
+class CrossCheckRequest(BaseModel):
+    """Ответ одной модели и проверка этого ответа другой моделью."""
+
+    prompt: str = Field(min_length=1, max_length=8_000)
+    requirement: str = Field(default="", max_length=32)
+    solver_model: str = Field(min_length=1, max_length=128)
+    reviewer_model: str = Field(min_length=1, max_length=128)
+    solver_reasoning: str = Field(default="off", max_length=16)
+    reviewer_reasoning: str = Field(default="off", max_length=16)
+    temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    max_tokens: int = Field(default=1_500, ge=16, le=10_000)
+
+
+class CrossCheckOut(BaseModel):
+    requirement: str = ""
+    answer: AnswerOut
+    review: ReviewOut
 
 
 class CompareItem(BaseModel):

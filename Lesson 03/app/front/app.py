@@ -27,7 +27,6 @@ with st.sidebar:
         key="nav_section",
         help="Чат → урок 01, форматы → урок 02, рассуждения → урок 03",
     )
-    st.caption(f"`{SECTIONS[section][1]}`")
     st.divider()
 
 page, _base = SECTIONS[section]

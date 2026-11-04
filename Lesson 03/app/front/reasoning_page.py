@@ -10,10 +10,12 @@ import pandas as pd
 import streamlit as st
 
 from common import (
+    PROVIDER_LABELS,
     REASONING_API,
     REASONING_LABELS,
     nixie_digits,
     post_stream,
+    provider_badges,
     selectable_models,
 )
 
@@ -26,13 +28,14 @@ DEFAULT_TASK = (
 
 @st.cache_data(ttl=20, show_spinner=False)
 def load_backend() -> dict:
-    result: dict = {"health": None, "models": [], "strategies": [], "council": {}, "error": None}
+    result: dict = {"health": None, "models": [], "strategies": [], "council": {}, "providers": [], "error": None}
     try:
         with httpx.Client(timeout=10.0) as client:
             result["health"] = client.get(f"{REASONING_API}/api/health").json()
             result["models"] = client.get(f"{REASONING_API}/api/models").json()
             result["strategies"] = client.get(f"{REASONING_API}/api/strategies").json()
             result["council"] = client.get(f"{REASONING_API}/api/council").json()
+            result["providers"] = client.get(f"{REASONING_API}/api/providers/status").json()
     except Exception as exc:  # noqa: BLE001
         result["error"] = f"{type(exc).__name__}: {exc}"
     return result
@@ -95,6 +98,14 @@ def _apply_council_task() -> None:
     task = COMPARE_TASKS.get(level or "")
     if task:
         st.session_state["rs_council_task"] = task["text"]
+
+
+def _apply_cross_task() -> None:
+    """Callback: подставить текст задачи во вкладку перекрёстной проверки."""
+    level = st.session_state.get("rs_cross_level")
+    task = COMPARE_TASKS.get(level or "")
+    if task:
+        st.session_state["rs_cross_task"] = task["text"]
 
 
 def _apply_compare_task() -> None:
@@ -181,7 +192,7 @@ def render() -> None:
     if backend["error"]:
         st.error("API урока 03 недоступен")
         st.caption(backend["error"])
-        st.caption(f"Адрес: `{REASONING_API}`. Поднять: `cd \"Lesson 03/app\" && docker compose up -d`")
+        st.caption('Поднять: `cd "Lesson 03/app" && docker compose up -d`')
         st.stop()
 
     models = backend["models"]
@@ -217,23 +228,25 @@ def render() -> None:
 
     with st.sidebar:
         health = backend["health"] or {}
-        provider_name = health.get("provider", "").partition(" @ ")[0] or "—"
         st.markdown(
-            f'<div class="provider-badge">{"🟢" if health.get("status") == "ok" else "🟠"} '
-            f"<b>{provider_name}</b></div>",
-            unsafe_allow_html=True,
+            provider_badges(backend.get("providers") or []), unsafe_allow_html=True
         )
 
         with st.popover(f"⚙  {current['label']}  ▾", use_container_width=True):
-            if api_models:
-                st.caption("DeepSeek API")
-            elif mock_models:
-                st.caption("Демо (офлайн) — ключ не настроен")
+            by_provider: dict[str, list[dict]] = {}
             for option in models:
-                mark = "✅ " if option["id"] == current["id"] else ""
-                if st.button(f"{mark}{option['label']}", key=f"rs_pick::{option['id']}", use_container_width=True):
-                    st.session_state.ui_model = option["id"]
-                    st.rerun()
+                by_provider.setdefault(option["provider"], []).append(option)
+            for provider, items in by_provider.items():
+                caption = PROVIDER_LABELS.get(provider, provider)
+                if provider == "mock":
+                    caption += " — ключ не настроен"
+                st.caption(caption)
+                for option in items:
+                    mark = "✅ " if option["id"] == current["id"] else ""
+                    if st.button(f"{mark}{option['label']}", key=f"rs_pick::{option['id']}",
+                                 use_container_width=True):
+                        st.session_state.ui_model = option["id"]
+                        st.rerun()
 
         st.divider()
 
@@ -291,8 +304,13 @@ def render() -> None:
 
     st.markdown("## Способы рассуждений")
 
-    tab_chat, tab_compare, tab_council = st.tabs(
-        ["Способы рассуждений", "Сравнение стратегий", "Совет экспертов"]
+    tab_chat, tab_compare, tab_council, tab_cross = st.tabs(
+        [
+            "Способы рассуждений",
+            "Сравнение стратегий",
+            "Совет экспертов",
+            "Перекрёстная проверка",
+        ]
     )
 
     # -- чат со стратегией --------------------------------------------------------
@@ -627,6 +645,11 @@ def render() -> None:
                     if review.get("error"):
                         st.error(review["error"])
                         continue
+                    if review.get("finish_reason") == "length":
+                        st.warning(
+                            "Разбор проверяющего оборван лимитом max_tokens — вердикты могут быть "
+                            "неполными."
+                        )
                     if not review.get("parsed"):
                         st.caption("Ответ проверяющего не разобран как JSON — показываю как есть.")
                     for verdict in review.get("verdicts") or []:
@@ -635,9 +658,134 @@ def render() -> None:
                     with st.expander("Сырой ответ проверяющего", expanded=False):
                         st.code(review.get("raw_text") or "—", language="json")
 
+    # -- перекрёстная проверка: одна модель отвечает, другая проверяет ------------
+    with tab_cross:
+        st.caption(
+            "Задачу решает выбранная модель, а проверяет её другая модель — "
+            "независимо от ролей совета экспертов."
+        )
+
+        st.session_state.setdefault("rs_cross_task", DEFAULT_TASK)
+        cross_kwargs: dict = dict(
+            label="Задача на логику",
+            options=list(COMPARE_TASKS),
+            format_func=lambda key: f"{key} · {COMPARE_TASKS[key]['title']}",
+            key="rs_cross_level",
+            on_change=_apply_cross_task,
+            help="Готовые задачи: от простой арифметики до головоломки",
+        )
+        if "rs_cross_level" not in st.session_state:
+            cross_kwargs["index"] = list(COMPARE_TASKS).index(DEFAULT_LEVEL)
+        cross_level = st.selectbox(**cross_kwargs)
+        cross_task = st.text_area("Задача", height=110, key="rs_cross_task")
+        cross_reference = COMPARE_TASKS.get(cross_level, {}).get("answer", "")
+        if cross_reference:
+            st.caption(f"Эталон: {cross_reference}")
+
+        titles = {item["id"]: item["label"] for item in models}
+        ids = list(titles)
+        col_answer, col_check = st.columns(2)
+
+        with col_answer:
+            solver_kwargs: dict = dict(
+                label="Модель отвечает",
+                options=ids,
+                format_func=lambda mid: f"{titles[mid]} · {mid}",
+                key="rs_cross_solver",
+            )
+            if "rs_cross_solver" not in st.session_state:
+                solver_kwargs["index"] = ids.index(current["id"])
+            solver_id = st.selectbox(**solver_kwargs)
+
+        with col_check:
+            others = [mid for mid in ids if mid != solver_id] or ids
+            if st.session_state.get("rs_cross_reviewer") not in others:
+                st.session_state["rs_cross_reviewer"] = others[0]
+            reviewer_id = st.selectbox(
+                "Модель проверяет",
+                options=others,
+                format_func=lambda mid: f"{titles[mid]} · {mid}",
+                key="rs_cross_reviewer",
+            )
+
+        cross_max_tokens = _nixie_slider("Max tokens", min_value=100, max_value=10_000, step=100,
+                                         default=1_500, key="rs_cross_max_tokens",
+                                         fmt=lambda v: f"{int(v):05d}",
+                                         help="Предел ответа для обеих моделей")
+
+        if st.button("🔍  Проверить ответ", type="primary", key="rs_cross_run"):
+            if not cross_task.strip():
+                st.warning("Нужна задача")
+            else:
+                with st.spinner("Модель отвечает, вторая проверяет…"):
+                    try:
+                        response = httpx.post(
+                            f"{REASONING_API}/api/cross-check",
+                            json={
+                                "prompt": cross_task,
+                                "requirement": cross_level,
+                                "solver_model": solver_id,
+                                "reviewer_model": reviewer_id,
+                                "temperature": 0.2,
+                                "max_tokens": int(cross_max_tokens),
+                            },
+                            timeout=300.0,
+                        )
+                        response.raise_for_status()
+                        st.session_state["rs_cross_result"] = response.json()
+                    except Exception as exc:  # noqa: BLE001 - показываем в UI
+                        st.session_state["rs_cross_result"] = None
+                        st.error(f"Не удалось получить ответ: {type(exc).__name__}: {exc}")
+
+        cross_result = st.session_state.get("rs_cross_result")
+        if cross_result:
+            cross_answer = cross_result.get("answer") or {}
+            cross_review = cross_result.get("review") or {}
+            col_left, col_right = st.columns(2)
+
+            with col_left:
+                st.markdown("### Ответ")
+                st.caption(
+                    f"{cross_answer.get('label', '—')} · {cross_answer.get('elapsed_ms', 0)} мс · "
+                    f"{cross_answer.get('usage', {}).get('completion_tokens', 0)} ток"
+                )
+                st.markdown(cross_answer.get("answer") or "—")
+                if cross_answer.get("truncated"):
+                    st.warning(
+                        "Ответ не уместился в лимит max_tokens = "
+                        f"{int(cross_max_tokens)} — текст оборван, итог может быть неполным. "
+                        "Увеличьте «Max tokens» и повторите."
+                    )
+                if cross_answer.get("reasoning"):
+                    with st.expander("Рассуждение модели", expanded=False):
+                        st.markdown(cross_answer["reasoning"])
+
+            with col_right:
+                st.markdown("### Проверка")
+                st.caption(
+                    f"{cross_review.get('label', '—')} · {cross_review.get('elapsed_ms', 0)} мс"
+                )
+                if cross_review.get("parsed"):
+                    for verdict in cross_review.get("verdicts") or []:
+                        st.markdown(
+                            f"{VERDICT_ICONS.get(verdict['verdict'], '·')} "
+                            f"**{cross_answer.get('label', 'ответ')}** — "
+                            f"{verdict.get('comment') or '—'}"
+                        )
+                else:
+                    st.caption("Проверяющий не вернул JSON со схемой — показываю как есть.")
+                if cross_review.get("finish_reason") == "length":
+                    st.warning(
+                        "Разбор проверяющего оборван лимитом max_tokens — вердикты могут быть "
+                        "неполными. Увеличьте «Max tokens» и повторите."
+                    )
+                if cross_review.get("final_answer"):
+                    st.markdown(f"**Итог проверки:** {cross_review['final_answer']}")
+                with st.expander("Сырой ответ проверяющего", expanded=False):
+                    st.code(cross_review.get("raw_text") or "—", language="json")
+
     with st.sidebar:
         st.divider()
-        st.caption(f"API урока 03: `{REASONING_API}`")
         if st.button("Очистить чат", use_container_width=True, key="rs_clear"):
             st.session_state.rs_history = []
             st.session_state.rs_compare = None

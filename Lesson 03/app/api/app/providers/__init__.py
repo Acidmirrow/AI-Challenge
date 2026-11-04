@@ -8,17 +8,23 @@ from .openai_provider import OpenAIProvider
 __all__ = ["Provider", "ProviderError", "ProviderRequest", "StreamEvent", "build_provider"]
 
 
+#: Провайдеры с OpenAI-совместимым API (deepseek, gemini, groq, openrouter — бесплатные тарифы)
+OPENAI_COMPATIBLE = ("openai", "deepseek", "gemini", "groq", "openrouter")
+
+
 def build_provider(settings: Settings, name: str | None = None) -> Provider:
-    """Провайдер по имени: mock всегда, openai/deepseek — только настроенный профиль."""
+    """Провайдер по имени модели: нужен только его ключ, основной профиль не помеха."""
     provider = name or settings.provider
     if provider == "mock":
         return MockProvider()
-    if provider in ("openai", "deepseek"):
-        if provider != settings.provider:
+    if provider in OPENAI_COMPATIBLE:
+        api_key, _ = settings.credentials(provider)
+        if not api_key:
             raise ProviderError(
-                f"Профиль {provider!r} не настроен: в app.properties указан provider={settings.provider}.",
-                kind="config",
+                f"Провайдер {provider!r} не настроен: нет ключа `{provider}.api.key` "
+                "в config/secrets.properties.",
+                kind="not_configured",
                 status=503,
             )
-        return OpenAIProvider(settings)
+        return OpenAIProvider(settings, provider)
     raise ProviderError(f"Неизвестный провайдер {provider!r}.", kind="config", status=500)

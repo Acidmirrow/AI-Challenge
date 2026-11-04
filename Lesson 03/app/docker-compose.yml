@@ -6,6 +6,9 @@ services:
     # Конфигурация и токены приходят файлами при деплое.
     volumes:
       - ./config:/srv/config:ro
+    extra_hosts:
+      # позволяет указать в secrets.properties локальный/корпоративный endpoint
+      - "host.docker.internal:host-gateway"
     ports:
       - "${API_PORT:-8003}:8000"
     healthcheck:
