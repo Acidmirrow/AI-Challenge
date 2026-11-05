@@ -1,0 +1,84 @@
+# Единая точка входа для всего курса: один хост и один порт.
+#
+#   UI:  http://localhost:8500        — общий интерфейс со всеми уроками
+#   API: http://localhost:8000        — шлюз: /lesson-01/api/..., /lesson-02/api/...
+#
+# Код каждого урока остаётся в своей папке (Lesson 0X/app) — здесь только сборка
+# четырёх API, шлюза и одного фронта. Отдельные `Lesson 0X/app/docker-compose.yml`
+# по-прежнему годятся для работы над одним уроком в изоляции.
+
+name: ai-challenge
+
+services:
+  lesson-01-api:
+    build: ./Lesson 01/app/api
+    volumes:
+      - ./Lesson 01/app/config:/srv/config:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  lesson-02-api:
+    build: ./Lesson 02/app/api
+    volumes:
+      - ./Lesson 02/app/config:/srv/config:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  lesson-03-api:
+    build: ./Lesson 03/app/api
+    volumes:
+      - ./Lesson 03/app/config:/srv/config:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  lesson-04-api:
+    build: ./Lesson 04/app/api
+    volumes:
+      - ./Lesson 04/app/config:/srv/config:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  gateway:
+    build: ./gateway
+    environment:
+      LESSON_01_URL: http://lesson-01-api:8000
+      LESSON_02_URL: http://lesson-02-api:8000
+      LESSON_03_URL: http://lesson-03-api:8000
+      LESSON_04_URL: http://lesson-04-api:8000
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      - lesson-01-api
+      - lesson-02-api
+      - lesson-03-api
+      - lesson-04-api
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  front:
+    build: ./Lesson 04/app/front
+    environment:
+      # Один адрес на все уроки — шлюз разводит их по префиксам.
+      CHAT_API_BASE_URL: http://gateway:8000/lesson-01
+      FORMAT_API_BASE_URL: http://gateway:8000/lesson-02
+      REASONING_API_BASE_URL: http://gateway:8000/lesson-03
+      TEMP_API_BASE_URL: http://gateway:8000/lesson-04
+    ports:
+      - "${FRONT_PORT:-8500}:8501"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    restart: unless-stopped
