@@ -503,6 +503,11 @@ def render() -> None:
             "Каждый участник работает со своей ролью, стратегией и reasoning."
         )
 
+        st.caption(
+            f"Лимит ответа каждого участника — «Max tokens» в сайдбаре: {int(max_tokens)}. "
+            "Если ответ не уместится, в таблице будет пометка «обрезан»."
+        )
+
         st.session_state.setdefault("rs_council_task", DEFAULT_TASK)
         council_kwargs: dict = dict(
             label="Задача на логику",
@@ -541,8 +546,7 @@ def render() -> None:
                                     "model": current["id"],
                                     "prompt": council_task.strip(),
                                     "expert": member["id"],
-                                    # рассуждения роли тоже едят бюджет — даём запас
-                                    "max_tokens": min(10_000, max(2_000, max_tokens)),
+                                    "max_tokens": max_tokens,
                                 },
                             )
                             response.raise_for_status()
@@ -566,7 +570,7 @@ def render() -> None:
                                         "model": current["id"],
                                         "prompt": council_task.strip(),
                                         "reviewer": member["id"],
-                                        "max_tokens": min(10_000, max(2_000, max_tokens)),
+                                        "max_tokens": max_tokens,
                                         "answers": [
                                             {
                                                 "id": item.get("expert"),
