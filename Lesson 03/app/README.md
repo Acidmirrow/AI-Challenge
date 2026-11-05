@@ -142,6 +142,11 @@ curl -X POST http://localhost:8003/api/cross-check \
        "solver_model": "qwen/qwen3.8-27b", "reviewer_model": "openai/gpt-oss-20b"}'
 ```
 
+Если `/models` провайдера недоступен (сеть, гео-блок, `403`), уроки используют
+запасной список бесплатных моделей Groq — те же id, что подключены в Hermes:
+`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`. Живой список
+из `/models` важнее: как только провайдер отвечает, каталог строится по нему.
+
 ## API
 
 | Метод | Путь | Назначение |

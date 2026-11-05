@@ -51,9 +51,10 @@ async def _load_free_models(settings, catalog) -> None:
             continue
         try:
             remote = await build_provider(settings, name).list_remote_models()
-        except Exception as exc:  # noqa: BLE001 - провайдер просто не подключаем
+        except Exception as exc:  # noqa: BLE001 - провайдер не отвечает
             logger.warning("free provider %s недоступен: %s", name, exc)
-            continue
+            # не выходим: для Groq есть запасной список, остальные просто пропускаем
+            remote = []
         models = free_models_from(name, remote)
         if models:
             catalog.extend(models)

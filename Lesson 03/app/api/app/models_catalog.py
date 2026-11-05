@@ -100,7 +100,12 @@ FREE_PROVIDER_RULES: dict[str, dict] = {
     },
     "openrouter": {
         "include": (":free",),
-        "exclude": ("embedding",),
+        "exclude": ("embedding", "safety", "guard", "moderation", "rerank", "whisper",
+                    "tts", "image", "audio", "code"),
+        # сначала известные чат-семейства, иначе берём самые короткие id
+        # порядок = приоритет: сначала модели, которые стабильно отвечают на free-тарифе
+        "prefer": ("nemotron-3.5-lightning", "nemotron", "gemma", "dots", "flint", "lfm",
+                   "north", "mistral", "llama", "gpt-oss", "qwen", "deepseek", "kimi"),
         "limit": 3,
     },
 }
@@ -108,13 +113,43 @@ FREE_PROVIDER_RULES: dict[str, dict] = {
 FREE_PROVIDERS = tuple(FREE_PROVIDER_RULES)
 
 
+#: Бесплатные модели Groq, которые также доступны в Hermes. Нужны как запасной
+#: список: если /models провайдера недоступен (сеть, гео-блок, 403), UI всё равно
+#: должен показывать те же модели, а не пустой список.
+GROQ_FALLBACK_MODELS: tuple[str, ...] = (
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "qwen/qwen3.8-27b",
+)
+
+#: Бесплатные модели OpenRouter на случай, если /models не отвечает (403/429).
+OPENROUTER_FALLBACK_MODELS: tuple[str, ...] = (
+    "nvidia/nemotron-3.5-lightning:free",
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "google/gemma-4-31b-it:free",
+)
+
+#: Запасные списки по провайдерам: живые модели из /models всегда важнее
+FALLBACK_MODELS: dict[str, tuple[str, ...]] = {
+    "groq": GROQ_FALLBACK_MODELS,
+    "openrouter": OPENROUTER_FALLBACK_MODELS,
+}
+
+
 def free_models_from(provider: str, remote_ids: list[str]) -> list[ModelInfo]:
     """Отобрать бесплатные модели провайдера из его собственного /models."""
     rule = FREE_PROVIDER_RULES.get(provider)
     if not rule:
         return []
+    prefer: tuple[str, ...] = rule.get("prefer") or ()
+
+    def rank(model_id: str) -> tuple[int, int, str]:
+        low = model_id.lower()
+        score = next((index for index, token in enumerate(prefer) if token in low), len(prefer))
+        return score, len(model_id), model_id
+
     picked: list[str] = []
-    for model_id in sorted(set(remote_ids), key=lambda value: (len(value), value)):
+    for model_id in sorted(set(remote_ids), key=rank):
         low = model_id.lower()
         if not any(token in low for token in rule["include"]):
             continue
@@ -123,6 +158,9 @@ def free_models_from(provider: str, remote_ids: list[str]) -> list[ModelInfo]:
         picked.append(model_id)
         if len(picked) >= rule["limit"]:
             break
+    if not picked and provider in FALLBACK_MODELS:
+        # /models не ответил — берём заранее известные бесплатные модели
+        picked = list(FALLBACK_MODELS[provider])
     return [
         ModelInfo(
             model_id,
