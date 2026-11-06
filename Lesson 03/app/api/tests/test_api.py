@@ -94,10 +94,6 @@ def test_free_models_picked_from_remote_list() -> None:
     ])
     assert [model.id for model in gemini] == ["gemini-2.5-pro", "gemini-2.5-flash"]
 
-    groq = free_models_from("groq", [
-        "llama-3.3-70b-versatile", "whisper-large-v3", "openai/gpt-oss-120b",
-    ])
-    assert {model.id for model in groq} == {"llama-3.3-70b-versatile", "openai/gpt-oss-120b"}
 
     openrouter = free_models_from("openrouter", [
         "deepseek/deepseek-chat-v3-0324:free", "openai/gpt-4.1", "meta-llama/llama-3.3-70b-instruct:free",

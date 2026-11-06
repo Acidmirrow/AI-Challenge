@@ -206,7 +206,7 @@ def render() -> None:
         models = selectable_models(models)
         current = next((m for m in models if m["id"] == st.session_state.ui_model), models[0])
         picked = model_picker(
-            models, current["id"], key="ui_model", caption="Каталог моделей урока 01"
+            models, current["id"], key="ui_model"
         )
         current = next(item for item in models if item["id"] == picked)
         st.session_state.ui_model = picked

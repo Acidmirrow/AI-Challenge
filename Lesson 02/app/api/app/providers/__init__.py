@@ -8,8 +8,8 @@ from .openai_provider import OpenAIProvider
 __all__ = ["Provider", "ProviderError", "ProviderRequest", "StreamEvent", "build_provider"]
 
 
-#: Провайдеры с OpenAI-совместимым API (gemini/groq/openrouter — бесплатные тарифы)
-OPENAI_COMPATIBLE = ("openai", "deepseek", "gemini", "groq", "openrouter")
+#: Провайдеры с OpenAI-совместимым API (gemini/openrouter — бесплатные тарифы)
+OPENAI_COMPATIBLE = ("openai", "deepseek", "gemini", "openrouter", "nous")
 
 
 def build_provider(settings: Settings, name: str | None = None) -> Provider:

@@ -14,8 +14,8 @@ __all__ = [
 ]
 
 
-#: OpenAI-совместимые провайдеры; gemini/groq/openrouter — бесплатные тарифы
-OPENAI_COMPATIBLE = ("openai", "deepseek", "gemini", "groq", "openrouter")
+#: OpenAI-совместимые провайдеры; gemini/openrouter — бесплатные тарифы
+OPENAI_COMPATIBLE = ("openai", "deepseek", "gemini", "openrouter", "nous")
 
 
 def build_provider(settings: Settings, name: str | None = None) -> Provider:
@@ -34,7 +34,7 @@ def build_provider(settings: Settings, name: str | None = None) -> Provider:
             )
         return OpenAIProvider(settings, name)
     raise ProviderError(
-        f"Неизвестный провайдер {name!r}. Допустимо: mock, openai, deepseek, gemini, groq, openrouter.",
+        f"Неизвестный провайдер {name!r}. Допустимо: mock, openai, deepseek, gemini, openrouter.",
         kind="config",
         status=500,
     )

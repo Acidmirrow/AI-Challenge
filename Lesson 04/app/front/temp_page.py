@@ -181,7 +181,6 @@ def render() -> None:
             models,
             st.session_state["t04_model"],
             key="t04_model",
-            caption="Каталог моделей урока 04",
         )
         current = next(item for item in models if item["id"] == model_id)
 

@@ -43,8 +43,8 @@ PROVIDER_LABELS = {
     "openai": "OpenAI",
     "deepseek": "DeepSeek",
     "gemini": "Gemini",
-    "groq": "Groq",
     "openrouter": "OpenRouter",
+    "nous": "Nous Portal",
     "mock": "Демо",
 }
 
@@ -59,7 +59,7 @@ async def _load_free_models(settings, catalog) -> None:
             remote = await build_provider(settings, name).list_remote_models()
         except Exception as exc:  # noqa: BLE001 - провайдер не отвечает
             logger.warning("free provider %s недоступен: %s", name, exc)
-            # не выходим: для Groq есть запасной список, остальные просто пропускаем
+            # не выходим: для OpenRouter и Nous Portal есть запасные списки, остальные пропускаем
             remote = []
         models = free_models_from(name, remote)
         if models:

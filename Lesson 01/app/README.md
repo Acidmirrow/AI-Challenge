@@ -71,7 +71,7 @@ DEEPSEEK_API_KEY = sk-...
   у DeepSeek V4 это `none / minimal / low / medium / high / xhigh / ultra / max`, у OpenAI — `low / medium / high`.
   Неверный для модели уровень API отклоняет с 400, UI предлагает только поддерживаемые.
   Текст размышлений провайдер отдаёт в `reasoning_content` — он стримится отдельным SSE-событием в раскрывающийся блок над ответом.
-- **Выбор модели** — один поповер `⚙ <модель> ▾` (Streamlit `st.popover`) со всеми провайдерами: они идут заголовками (`DeepSeek API`, `Groq · бесплатно`, `OpenRouter · бесплатно`), у каждой модели галочка на текущей, `id` и уровни reasoning. Каждая модель в `/api/models` несёт поле `provider`, поэтому выбор модели переключает и бэкенд; офлайн-`mock` остаётся в списке как аварийный вариант.
+- **Выбор модели** — один поповер `⚙ <модель> ▾` (Streamlit `st.popover`) со всеми провайдерами: они идут заголовками (`DeepSeek API`, `OpenRouter · бесплатно`), у каждой модели галочка на текущей, `id` и уровни reasoning. Каждая модель в `/api/models` несёт поле `provider`, поэтому выбор модели переключает и бэкенд; офлайн-`mock` остаётся в списке как аварийный вариант.
 - **Слайдеры в стиле ламповых часов** — температура и max tokens: тёмные «трубки» с янтарным свечением и глоу-ползунком.
 - **Веб-поиск** — переключатель «🔎 Искать в интернете» + выбор провайдера: `Авто`, DuckDuckGo, Bing, Brave (HTML) работают без ключа, Brave API и Tavily включаются при наличии ключа. API читает текст топ-страниц и передаёт его модели вместе со ссылками; источники показываются под ответом раскрывающимся блоком.
 - **Промпт-инженерия** — системный промпт, лимит токенов, экспорт диалога в JSON, очистка чата.
@@ -84,11 +84,12 @@ DEEPSEEK_API_KEY = sk-...
 | Провайдер | Ключ в `config/secrets.properties` | Где взять | Фильтр моделей |
 |---|---|---|---|
 | Google AI Studio | `gemini.api.key =` | https://aistudio.google.com/apikey | `gemini-*` без embedding/tts/image |
-| Groq | `groq.api.key =` | https://console.groq.com/keys | `llama*`, `gpt-oss*`, `qwen*` |
 | OpenRouter | `openrouter.api.key =` | https://openrouter.ai/keys | только `:free` |
+| Nous Portal | `nous.api.key =` | https://portal.nousresearch.com | только `:free`, до четырёх моделей |
 
 Список моделей не хардкодится: при старте API читает `/models` каждого провайдера,
-у которого есть ключ, и подключает до трёх подходящих моделей. Перечитать каталог
+у которого есть ключ, и подключает до трёх подходящих моделей (Nous Portal — до
+четырёх). Перечитать каталог
 без перезапуска контейнера:
 
 ```bash
@@ -107,8 +108,11 @@ curl -X POST http://localhost:8000/api/models/refresh
 режет ответ по бюджету и возвращает `finish_reason=length`.
 
 Если `/models` провайдера недоступен (сеть, гео-блок, `403`), уроки используют
-запасной список бесплатных моделей Groq — те же id, что подключены в Hermes:
-`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`. Живой список
+запасной список бесплатных моделей OpenRouter:
+`nvidia/nemotron-3.5-lightning:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`,
+`google/gemma-4-31b-it:free`; Nous Portal — `stepfun/step-3.7-flash:free`,
+`upstage/solar-mini4:free`, `meituan/longcat-2.5:free`,
+`reflection/beam-1.0-501b-a23b:free`. Живой список
 из `/models` важнее: как только провайдер отвечает, каталог строится по нему.
 
 ## API
@@ -225,7 +229,7 @@ app/
 ## Тесты
 
 ```bash
-docker compose run --rm api python -m pytest -q   # 64 теста: health, models, стрим, поиск, провайдеры, фолбэки
+docker compose run --rm api python -m pytest -q   # 63 теста: health, models, стрим, поиск, провайдеры, фолбэки
 ```
 
 ## Заметки

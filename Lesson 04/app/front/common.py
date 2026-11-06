@@ -22,16 +22,16 @@ SOURCE_LABELS = {
     "deepseek": "DeepSeek API",
     "openai": "OpenAI API",
     "gemini": "Google Gemini",
-    "groq": "Groq",
     "openrouter": "OpenRouter",
+    "nous": "Nous Portal",
 }
 #: подписи групп в попапе выбора модели
 PROVIDER_LABELS = {
     "deepseek": "DeepSeek API",
     "openai": "OpenAI API",
     "gemini": "Google Gemini · бесплатно",
-    "groq": "Groq · бесплатно",
     "openrouter": "OpenRouter · бесплатно",
+    "nous": "Nous Portal · бесплатно",
     "mock": "Демо (офлайн)",
 }
 REASONING_LABELS = {
@@ -57,12 +57,44 @@ BASE_CSS = f"""
                     margin: 0 0 .55rem 0; }}
       .provider-badge {{ font-size: .8rem; opacity: .85; margin: -.1rem 0 .35rem 0; cursor: default; }}
       .prov-chip {{ margin-right: .7rem; white-space: nowrap; }}
+      /* кнопка выбора модели — тихая, как вторичная кнопка «Очистить» */
       [data-testid="stPopover"] button[data-testid="stPopoverButton"] {{
-          width: 100%; justify-content: center; font-weight: 600;
-          background: linear-gradient(180deg, #8b6bff, #6f4ae6) !important; color: #fff !important;
-          border: 1px solid #7a55f0 !important;
+          width: 100%; justify-content: center; font-weight: 400 !important;
+          font-size: .92rem !important; min-height: 2.2rem !important; height: 2.2rem !important;
+          padding: 0 .6rem !important;
+          background: var(--secondary-background-color, rgba(27, 32, 44, 1)) !important;
+          background-image: none !important;
+          color: var(--text-color, #e6e8ef) !important;
+          border: 1px solid rgba(230, 232, 239, .2) !important;
+          box-shadow: none !important;
       }}
-      [data-testid="stPopoverBody"], [role="dialog"] {{ min-width: 15rem; max-width: 18rem; }}
+      [data-testid="stPopover"] button[data-testid="stPopoverButton"]:hover {{
+          border-color: rgba(230, 232, 239, .35) !important;
+      }}
+      [data-testid="stPopoverBody"], [role="dialog"] {{ min-width: 16rem; max-width: 16.5rem; }}
+      [data-testid="stPopoverBody"] {{ padding: .4rem .3rem !important; }}
+      [data-testid="stPopoverBody"] [data-testid="stVerticalBlock"] {{ gap: .05rem !important; }}
+      /* выбор модели: компактный строгий список, галочка у левого края */
+      .picker-count {{ font-size: .64rem; opacity: .45; margin: 0 0 .1rem 1.1rem; line-height: 1.2; }}
+      [data-testid="stHtml"] {{ margin: 0 !important; }}
+      [data-testid="stPopoverBody"] button {{ justify-content: flex-start !important;
+                                              text-align: left !important;
+                                              min-height: 1.7rem !important;
+                                              height: 1.7rem !important;
+                                              padding: 0 .45rem !important;
+                                              font-size: .82rem !important;
+                                              line-height: 1 !important;
+                                              border: none !important;
+                                              background: transparent !important;
+                                              box-shadow: none !important;
+                                              border-radius: .3rem !important; }}
+      [data-testid="stPopoverBody"] button p {{ font-size: .82rem !important; margin: 0 !important;
+                                                white-space: nowrap; overflow: hidden;
+                                                text-overflow: ellipsis; max-width: 100%; }}
+      [data-testid="stPopoverBody"] button:hover {{ background: rgba(128, 128, 128, .14) !important; }}
+      [data-testid="stPopoverBody"] button > div {{ justify-content: flex-start !important;
+                                                    text-align: left !important;
+                                                    width: 100%; }}
 
       /* ламповое табло слайдеров */
       .nixie {{ display: flex; gap: 6px; margin: .05rem 0 .5rem 0;
@@ -172,12 +204,11 @@ def model_picker(
     selected_id: str | None,
     *,
     key: str,
-    caption: str = "",
 ) -> str:
-    """Единый выбор модели для всех уроков: поповер со списком по провайдерам.
+    """Единый выбор модели: счётчик и строгий список названий.
 
-    Один и тот же вид в уроках 01–04: кнопка `⚙ <модель> ▾`, внутри — провайдеры
-    заголовками, модели кнопками (текущая помечена ✅) и подписью `id · reasoning`.
+    Кнопка `⚙ <модель> ▾`, внутри — «Доступно моделей: N» и плоский список
+    без id/URL и подписей; выбранная модель отмечена галочкой у левого края.
     Возвращает выбранный id модели.
     """
     if not models:
@@ -185,37 +216,16 @@ def model_picker(
 
     current = next((item for item in models if item["id"] == selected_id), models[0])
     with st.popover(f"⚙  {current['label']}  ▾", use_container_width=True):
-        if caption:
-            st.caption(caption)
-
-        grouped: dict[str, list[dict]] = {}
+        st.html(f'<div class="picker-count">Моделей: {len(models)}</div>')
         for item in models:
-            grouped.setdefault(item.get("provider") or "mock", []).append(item)
-
-        for provider, items in grouped.items():
-            label = PROVIDER_LABELS.get(provider, provider.title())
-            if provider == "mock":
-                label += " — ключ не настроен"
-            st.caption(label)
-            for item in items:
-                mark = "✅ " if item["id"] == current["id"] else ""
-                if st.button(
-                    f"{mark}{item['label']}",
-                    key=f"{key}::pick::{item['id']}",
-                    use_container_width=True,
-                ):
-                    st.session_state[key] = item["id"]
-                    st.rerun()
-                details = [f"`{item['id']}`"]
-                levels = item.get("reasoning_levels") or []
-                if levels:
-                    details.append(
-                        f"reasoning: {levels[0]}…{levels[-1]}"
-                        if len(levels) > 1
-                        else f"reasoning: {levels[0]}"
-                    )
-                if not item.get("supports_temperature", True):
-                    details.append("без temperature")
-                st.caption(" · ".join(details))
+            # место под галочку резервируем всегда — названия выровнены по левому краю
+            mark = "✓ " if item["id"] == current["id"] else "\u00a0" * 4
+            if st.button(
+                f"{mark}{item['label']}",
+                key=f"{key}::pick::{item['id']}",
+                use_container_width=True,
+            ):
+                st.session_state[key] = item["id"]
+                st.rerun()
 
     return st.session_state.get(key) or current["id"]

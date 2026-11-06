@@ -23,12 +23,12 @@ docker compose up -d --build
 
 | Ручка | Зачем |
 |---|---|
-| **Модель** | поповер `⚙ <модель> ▾` со всеми провайдерами: DeepSeek, бесплатные Groq и OpenRouter |
+| **Модель** | поповер `⚙ <модель> ▾` со всеми провайдерами: DeepSeek и бесплатные OpenRouter, Nous Portal |
 | **Температура** | 0.0…2.0 с шагом 0.1, действует на чат |
 | **Max tokens** | 100…10 000, общий предел для чата и для сравнения |
 
 Плюс строка индикаторов доступности: `🟢` отвечает, `🟠` ключ есть но провайдер не
-отвечает, `⚪` ключа нет — например `🟢 DeepSeek ⚪ Gemini 🟠 Groq 🟢 OpenRouter`.
+отвечает, `⚪` ключа нет — например `🟢 DeepSeek ⚪ Gemini 🟠 OpenRouter`.
 
 ### Основное окно
 
@@ -71,8 +71,9 @@ docker compose up -d --build
    ошибки и какую температуру брать для такой задачи.
 
 Если `/models` провайдера недоступен (сеть, гео-блок, `403`), уроки используют
-запасной список бесплатных моделей Groq — те же id, что подключены в Hermes:
-`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`. Живой список
+запасной список бесплатных моделей OpenRouter:
+`nvidia/nemotron-3.5-lightning:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`,
+`google/gemma-4-31b-it:free`. Живой список
 из `/models` важнее: как только провайдер отвечает, каталог строится по нему.
 
 ## API
@@ -119,14 +120,14 @@ curl -X POST http://localhost:8004/api/temperature/compare \
 
 ## Бесплатные провайдеры
 
-Как и в прошлых уроках: `gemini.api.key`, `groq.api.key`, `openrouter.api.key`
+Как и в прошлых уроках: `gemini.api.key`, `openrouter.api.key`, `nous.api.key`
 в `config/secrets.properties`. Список моделей читается из `/models` провайдера
 при старте (до трёх подходящих на провайдера), `POST /api/models/refresh`
 перечитывает без перезапуска.
 
 Если `/models` недоступен (сеть, гео-блок, `403`), используется запасной список:
-Groq — `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`;
-OpenRouter — `nemotron-3.5-lightning`, `nemotron-3-ultra`, `gemma-4-31b`. Живой
+OpenRouter — `nemotron-3.5-lightning`, `nemotron-3-ultra`, `gemma-4-31b`;
+Nous Portal — `step-3.7-flash`, `solar-mini4`, `longcat-2.5`, `beam-1.0-501b`. Живой
 список всегда важнее запасного.
 
 ## Один интерфейс для четырёх уроков
@@ -160,7 +161,7 @@ Lesson 04/app/
 │   │   ├── tasks.py           # 5 типов задач × 3 варианта сложности
 │   │   ├── schemas.py         # запросы/ответы
 │   │   └── main.py            # чат, сравнение температур, статус провайдеров
-│   └── tests/                 # 18 тестов
+│   └── tests/                 # 17 тестов
 ├── front/                     # общий UI уроков 01–04 + temp_page.py
 ├── config/                    # app.properties + secrets.properties (gitignored)
 └── docker-compose.yml         # temperature-lab, порты 8004 / 8504

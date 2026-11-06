@@ -27,7 +27,7 @@
 - Форматы ходят в собственный API (`format-lab`, порт 8002) через `FORMAT_API_BASE_URL`.
 - Выбранная модель хранится в общем состоянии (`ui_model`), поэтому переключение
   разделов её не сбрасывает; выбор — один поповер `⚙ <модель> ▾` с группировкой
-  по провайдерам (DeepSeek / Groq / OpenRouter).
+  по провайдерам (DeepSeek / OpenRouter).
 - Чтобы вкладка чата работала, стек первого урока должен быть запущен:
   `cd "Lesson 01/app" && docker compose up -d`.
 
@@ -208,11 +208,12 @@ extra additionalProperties лишнее поле — схема запрещае
 | Провайдер | Ключ в `config/secrets.properties` | Где взять | Фильтр моделей |
 |---|---|---|---|
 | Google AI Studio | `gemini.api.key =` | https://aistudio.google.com/apikey | `gemini-*` без embedding/tts/image |
-| Groq | `groq.api.key =` | https://console.groq.com/keys | `llama*`, `gpt-oss*`, `qwen*` |
 | OpenRouter | `openrouter.api.key =` | https://openrouter.ai/keys | только `:free` |
+| Nous Portal | `nous.api.key =` | https://portal.nousresearch.com | только `:free`, до четырёх моделей |
 
 Список моделей не хардкодится: при старте API читает `/models` каждого провайдера,
-у которого есть ключ, и подключает до трёх подходящих моделей. Перечитать каталог
+у которого есть ключ, и подключает до трёх подходящих моделей (Nous Portal — до
+четырёх). Перечитать каталог
 без перезапуска контейнера:
 
 ```bash
@@ -221,11 +222,14 @@ curl -X POST http://localhost:8000/api/models/refresh
 
 В UI такие модели видны в поповере выбора модели: для провайдера появляется
 отдельная группа, а у моделей стоит пометка «(free)». Если `/models` провайдера
-недоступен, используются запасные списки Groq и OpenRouter — живые данные важнее.
+недоступен, используется запасной список OpenRouter — живые данные важнее.
 
 Если `/models` провайдера недоступен (сеть, гео-блок, `403`), уроки используют
-запасной список бесплатных моделей Groq — те же id, что подключены в Hermes:
-`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`. Живой список
+запасной список бесплатных моделей OpenRouter:
+`nvidia/nemotron-3.5-lightning:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`,
+`google/gemma-4-31b-it:free`; Nous Portal — `stepfun/step-3.7-flash:free`,
+`upstage/solar-mini4:free`, `meituan/longcat-2.5:free`,
+`reflection/beam-1.0-501b-a23b:free`. Живой список
 из `/models` важнее: как только провайдер отвечает, каталог строится по нему.
 
 ## API
@@ -296,7 +300,7 @@ Lesson 02/app/
 ## Тесты
 
 ```bash
-docker compose run --rm api python -m pytest -q   # 44 теста
+docker compose run --rm api python -m pytest -q   # 43 теста
 ```
 
 Покрыто: сборка запроса для каждого формата, парсинг (включая ```-обёртки и битый JSON),

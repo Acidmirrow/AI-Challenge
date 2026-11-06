@@ -234,7 +234,7 @@ def render() -> None:
         )
 
         picked = model_picker(
-            models, current["id"], key="ui_model", caption="Каталог моделей урока 03"
+            models, current["id"], key="ui_model"
         )
         current = next((item for item in models if item["id"] == picked), models[0])
         st.session_state.ui_model = picked

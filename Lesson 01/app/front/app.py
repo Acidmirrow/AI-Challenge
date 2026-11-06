@@ -34,8 +34,8 @@ SOURCE_LABELS = {
     "deepseek": "DeepSeek API",
     "openai": "OpenAI API",
     "gemini": "Gemini",
-    "groq": "Groq",
     "openrouter": "OpenRouter",
+    "nous": "Nous Portal",
 }
 
 

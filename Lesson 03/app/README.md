@@ -51,7 +51,6 @@ open http://localhost:8003/docs      # API
 | Провайдер | Ключ | Что подключается (до 3 моделей) | Что даёт бесплатный тариф |
 |---|---|---|---|
 | Google AI Studio | `gemini.api.key` | модели `gemini-*` (кроме embedding/tts/image) | контекст 1M, вывод до 65k, лимит по числу запросов в сутки |
-| Groq | `groq.api.key` | `llama*`, `gpt-oss*`, `qwen*` | очень быстрый инференс, 128–131k контекста |
 | OpenRouter | `openrouter.api.key` | модели с суффиксом `:free` | бесплатные версии моделей |
 
 Список моделей **не хардкодится**: при старте API читает `/models` каждого
@@ -60,12 +59,11 @@ open http://localhost:8003/docs      # API
 `POST /api/models/refresh`.
 
 Ключи выдаются без карты: [aistudio.google.com/apikey](https://aistudio.google.com/apikey),
-[console.groq.com/keys](https://console.groq.com/keys), [openrouter.ai/keys](https://openrouter.ai/keys).
+[openrouter.ai/keys](https://openrouter.ai/keys).
 После правки файла — `docker compose restart api`.
 
 Если `/models` провайдера недоступен (сеть, гео-блок, `403`), остаются запасные
-списки: Groq — `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`,
-OpenRouter — три модели `nemotron`/`gemma`. Живой список важнее запасного.
+список: OpenRouter — три модели `nemotron`/`gemma`. Живой список важнее запасного.
 
 Ограничение бесплатных тарифов — на **число запросов в сутки**, а не на длину ответа,
 поэтому окно вывода у них широкое; наш собственный потолок `max_tokens` — 10 000.
@@ -90,7 +88,7 @@ OpenRouter — три модели `nemotron`/`gemma`. Живой список �
 ## UI
 
 - Сайдбар: переключатель раздела, модель — единый для всех уроков поповер
-  `⚙ <модель> ▾` с группами провайдеров (DeepSeek / Groq / OpenRouter), **группа экспертов**, **выбор способа рассуждения**
+  `⚙ <модель> ▾` с группами провайдеров (DeepSeek / OpenRouter), **группа экспертов**, **выбор способа рассуждения**
   (список стратегий с описанием и system-промптом в раскрывашке) и **три фильтра** —
   `Температура`, `Reasoning`, `Max tokens` (100…10000, шаг 100). Больше ничего:
   остальные ручки урока 02 здесь не нужны.
@@ -132,7 +130,7 @@ OpenRouter — три модели `nemotron`/`gemma`. Живой список �
 ## Перекрёстная проверка
 
 Четвёртая вкладка: задача решается одной моделью, а проверяется другой — без ролей
-совета экспертов, только модели из каталога (включая бесплатные Groq).
+совета экспертов, только модели из каталога (включая бесплатные OpenRouter).
 
 - пресет задачи выбирается из тех же логических задач, что и в сравнении стратегий
   (`extra low` … `extra high`), текст задачи можно править руками, эталон показан рядом;
@@ -152,8 +150,11 @@ curl -X POST http://localhost:8003/api/cross-check \
 ```
 
 Если `/models` провайдера недоступен (сеть, гео-блок, `403`), уроки используют
-запасной список бесплатных моделей Groq — те же id, что подключены в Hermes:
-`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`. Живой список
+запасной список бесплатных моделей OpenRouter:
+`nvidia/nemotron-3.5-lightning:free`, `nvidia/nemotron-3-ultra-550b-a55b:free`,
+`google/gemma-4-31b-it:free`; Nous Portal — `stepfun/step-3.7-flash:free`,
+`upstage/solar-mini4:free`, `meituan/longcat-2.5:free`,
+`reflection/beam-1.0-501b-a23b:free`. Живой список
 из `/models` важнее: как только провайдер отвечает, каталог строится по нему.
 
 ## API
@@ -203,7 +204,7 @@ event: error    {"message":"…","kind":"bad_request"}
 ## Тесты
 
 ```bash
-docker compose run --rm api python -m pytest -q   # 31 тест
+docker compose run --rm api python -m pytest -q   # 30 тестов
 ```
 
 Покрыто: каталог стратегий, разбор ответа по маркеру (включая `direct` и ответ без `---`),

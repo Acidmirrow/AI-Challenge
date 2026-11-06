@@ -43,13 +43,17 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com/v1"
 
     # Бесплатные провайдеры с OpenAI-совместимым API.
-    # Все три дают бесплатный тариф: ключ выдаётся без карты.
+    # Оба дают бесплатный тариф: ключ выдаётся без карты.
     gemini_api_key: str = ""
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
-    groq_api_key: str = ""
-    groq_base_url: str = "https://api.groq.com/openai/v1"
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    # Nous Portal: бесплатный тариф на модели с суффиксом ":free"
+    nous_api_key: str = ""
+    nous_base_url: str = "https://inference-api.nousresearch.com/v1"
+    # Локальный broker-прокси Hermes (`hermes proxy`) принимает только loopback-Host;
+    # заполните, если nous.base.url указывает на host.docker.internal:8645.
+    nous_host_header: str = ""
 
     # Name of the parameter used to control reasoning depth.
     # OpenAI: reasoning_effort. Set to "" for gateways that reject unknown params.
@@ -84,8 +88,8 @@ class Settings(BaseSettings):
             "openai": (self.openai_api_key, self.openai_base_url),
             "deepseek": (self.deepseek_api_key, self.deepseek_base_url),
             "gemini": (self.gemini_api_key, self.gemini_base_url),
-            "groq": (self.groq_api_key, self.groq_base_url),
             "openrouter": (self.openrouter_api_key, self.openrouter_base_url),
+            "nous": (self.nous_api_key, self.nous_base_url),
         }
         return mapping.get(provider, ("", ""))
 

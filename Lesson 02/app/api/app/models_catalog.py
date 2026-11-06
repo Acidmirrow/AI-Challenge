@@ -88,10 +88,11 @@ FREE_PROVIDER_RULES: dict[str, dict] = {
         "exclude": ("embedding", "embed", "tts", "image", "imagen", "veo", "live"),
         "limit": 3,
     },
-    "groq": {
-        "include": ("llama", "gpt-oss", "qwen", "kimi"),
-        "exclude": ("whisper", "tts", "guard", "embed", "distil"),
-        "limit": 3,
+    "nous": {
+        "include": (":free",),
+        "exclude": ("embedding", "embed", "tts", "image", "audio", "moderation",
+                    "rerank", "guard"),
+        "limit": 4,
     },
     "openrouter": {
         "include": (":free",),
@@ -108,15 +109,6 @@ FREE_PROVIDER_RULES: dict[str, dict] = {
 FREE_PROVIDERS = tuple(FREE_PROVIDER_RULES)
 
 
-#: Бесплатные модели Groq, которые также доступны в Hermes. Нужны как запасной
-#: список: если /models провайдера недоступен (сеть, гео-блок, 403), UI всё равно
-#: должен показывать те же модели, а не пустой список.
-GROQ_FALLBACK_MODELS: tuple[str, ...] = (
-    "openai/gpt-oss-120b",
-    "openai/gpt-oss-20b",
-    "qwen/qwen3.8-27b",
-)
-
 #: Бесплатные модели OpenRouter на случай, если /models не отвечает (403/429).
 OPENROUTER_FALLBACK_MODELS: tuple[str, ...] = (
     "nvidia/nemotron-3.5-lightning:free",
@@ -124,9 +116,17 @@ OPENROUTER_FALLBACK_MODELS: tuple[str, ...] = (
     "google/gemma-4-31b-it:free",
 )
 
+#: Бесплатные модели Nous Portal на случай, если его /models не отвечает.
+NOUS_FALLBACK_MODELS: tuple[str, ...] = (
+    "stepfun/step-3.7-flash:free",
+    "upstage/solar-mini4:free",
+    "meituan/longcat-2.5:free",
+    "reflection/beam-1.0-501b-a23b:free",
+)
+
 #: Запасные списки по провайдерам: живые модели из /models всегда важнее
 FALLBACK_MODELS: dict[str, tuple[str, ...]] = {
-    "groq": GROQ_FALLBACK_MODELS,
+    "nous": NOUS_FALLBACK_MODELS,
     "openrouter": OPENROUTER_FALLBACK_MODELS,
 }
 
@@ -172,8 +172,6 @@ def _short_name(model_id: str) -> str:
     """Человекочитаемое имя: путь и суффикс :free убираем."""
     name = model_id.split("/")[-1].removesuffix(":free")
     return name.replace("-", " ").replace("_", " ").title()
-
-
 
 
 def _from_file(path: str, default_provider: str) -> list[ModelInfo]:

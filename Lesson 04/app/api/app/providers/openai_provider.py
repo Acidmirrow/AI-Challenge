@@ -28,10 +28,15 @@ class OpenAIProvider(Provider):
             )
         self._settings = settings
         self._base_url = base_url
+        extra: dict = {}
+        if self.name == "nous" and settings.nous_host_header:
+            # broker-прокси отказывает «чужим» Host: подставляем его loopback-имя
+            extra["default_headers"] = {"Host": settings.nous_host_header}
         self._client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
             timeout=settings.http_timeout_s,
+            **extra,
         )
 
     # -- request building -----------------------------------------------------
@@ -138,6 +143,8 @@ class OpenAIProvider(Provider):
     async def list_remote_models(self) -> list[str]:
         url = self._base_url.rstrip("/") + "/models"
         headers = {"Authorization": f"Bearer {self._client.api_key}"}
+        if self.name == "nous" and self._settings.nous_host_header:
+            headers["Host"] = self._settings.nous_host_header
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(url, headers=headers)
             response.raise_for_status()
@@ -152,6 +159,8 @@ def _kind(exc: Exception) -> str:
     status = getattr(exc, "status_code", None)
     if status == 401:
         return "auth"
+    if status == 402:
+        return "payment"
     if status == 429:
         return "rate_limit"
     if status in (400, 404, 422):
@@ -164,6 +173,12 @@ def _humanize(exc: Exception) -> str:
     body = getattr(exc, "message", None) or str(exc)
     if status == 401:
         return "Провайдер отклонил ключ (401). Проверь токен в config/secrets.properties."
+    if status == 402:
+        return (
+            "Провайдер вернул 402: запрос без действующего ключа или вне бесплатного "
+            "тарифа. Для Nous Portal нужен ключ `nous.api.key` — план Free открывает "
+            "модели с суффиксом `:free`."
+        )
     if status == 429:
         return "Провайдер вернул 429: лимит запросов или квота исчерпаны."
     if status in (400, 422):

@@ -20,16 +20,16 @@ SOURCE_LABELS = {
     "deepseek": "DeepSeek API",
     "openai": "OpenAI API",
     "gemini": "Google Gemini",
-    "groq": "Groq",
     "openrouter": "OpenRouter",
+    "nous": "Nous Portal",
 }
 #: подписи групп в попапе выбора модели
 PROVIDER_LABELS = {
     "deepseek": "DeepSeek API",
     "openai": "OpenAI API",
     "gemini": "Google Gemini · бесплатно",
-    "groq": "Groq · бесплатно",
     "openrouter": "OpenRouter · бесплатно",
+    "nous": "Nous Portal · бесплатно",
     "mock": "Демо (офлайн)",
 }
 REASONING_LABELS = {
@@ -164,4 +164,3 @@ def provider_badges(rows: list[dict]) -> str:
             dot, hint = "🟠", row.get("error") or "нет ответа"
         chips.append(f'<span class="prov-chip" title="{hint}">{dot} {label}</span>')
     return f'<div class="provider-badge">{"".join(chips)}</div>' if chips else ""
-

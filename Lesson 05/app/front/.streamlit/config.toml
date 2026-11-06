@@ -1,0 +1,20 @@
+[theme]
+base = "dark"
+primaryColor = "#7C5CFF"
+backgroundColor = "#0E1117"
+secondaryBackgroundColor = "#161A23"
+textColor = "#E6E8EF"
+font = "sans serif"
+
+[server]
+headless = true
+runOnSave = false
+
+[browser]
+gatherUsageStats = false
+
+# Hide the "Deploy" button and Streamlit's developer toolbar
+# (auto | developer | viewer | minimal)
+[client]
+toolbarMode = "minimal"
+showSidebarNavigation = false

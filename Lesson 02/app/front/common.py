@@ -128,8 +128,8 @@ PROVIDER_LABELS = {
     "deepseek": "DeepSeek",
     "openai": "OpenAI",
     "gemini": "Gemini",
-    "groq": "Groq",
     "openrouter": "OpenRouter",
+    "nous": "Nous Portal",
 }
 
 
@@ -148,4 +148,3 @@ def provider_badges(rows: list[dict]) -> str:
             dot, hint = "🟠", row.get("error") or "нет ответа"
         chips.append(f'<span class="prov-chip" title="{hint}">{dot} {label}</span>')
     return f'<div class="provider-badge">{"".join(chips)}</div>' if chips else ""
-
