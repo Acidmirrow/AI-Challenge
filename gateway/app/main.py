@@ -27,6 +27,7 @@ def _upstreams() -> dict[str, str]:
         "lesson-03": "http://lesson-03-api:8000",
         "lesson-04": "http://lesson-04-api:8000",
         "lesson-05": "http://lesson-05-api:8000",
+        "lesson-06": "http://lesson-06-api:8000",
     }
     for lesson, value in default.items():
         override = os.getenv(f"{lesson.upper().replace('-', '_')}_URL", "")
@@ -43,6 +44,7 @@ TITLES = {
     "lesson-03": "Урок 03 — способы рассуждений",
     "lesson-04": "Урок 04 — температура",
     "lesson-05": "Урок 05 — сравнение моделей",
+    "lesson-06": "Урок 06 — ИИ-агент",
 }
 
 #: заголовки, которые нельзя пробрасывать как есть
