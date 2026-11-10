@@ -1,0 +1,45 @@
+name: context-lab
+
+services:
+  api:
+    build: ./api
+    volumes:
+      - ./config:/srv/config:ro
+      # История диалогов переживает перезапуск контейнера.
+      - ./data:/srv/data
+    environment:
+      CONTEXT_DB_PATH: /srv/data/context.db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${API_PORT:-8007}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).status == 200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  front:
+    build: ./front
+    environment:
+      CONTEXT_API_BASE_URL: http://api:8000
+      CHAT_API_BASE_URL: ${CHAT_API_BASE_URL:-http://host.docker.internal:8000}
+      FORMAT_API_BASE_URL: ${FORMAT_API_BASE_URL:-http://host.docker.internal:8002}
+      REASONING_API_BASE_URL: ${REASONING_API_BASE_URL:-http://host.docker.internal:8003}
+      TEMP_API_BASE_URL: ${TEMP_API_BASE_URL:-http://host.docker.internal:8004}
+      MODEL_API_BASE_URL: ${MODEL_API_BASE_URL:-http://host.docker.internal:8005}
+      AGENT_API_BASE_URL: ${AGENT_API_BASE_URL:-http://host.docker.internal:8006}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${FRONT_PORT:-8507}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

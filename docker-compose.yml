@@ -58,6 +58,18 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
+  lesson-07-api:
+    build: ./Lesson 07/app/api
+    volumes:
+      - ./Lesson 07/app/config:/srv/config:ro
+      # История диалогов сохраняется между перезапусками контейнера.
+      - ./Lesson 07/app/data:/srv/data
+    environment:
+      CONTEXT_DB_PATH: /srv/data/context.db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
   gateway:
     build: ./gateway
     environment:
@@ -67,6 +79,7 @@ services:
       LESSON_04_URL: http://lesson-04-api:8000
       LESSON_05_URL: http://lesson-05-api:8000
       LESSON_06_URL: http://lesson-06-api:8000
+      LESSON_07_URL: http://lesson-07-api:8000
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -76,6 +89,7 @@ services:
       - lesson-04-api
       - lesson-05-api
       - lesson-06-api
+      - lesson-07-api
     healthcheck:
       test:
         - CMD
@@ -98,6 +112,7 @@ services:
       TEMP_API_BASE_URL: http://gateway:8000/lesson-04
       MODEL_API_BASE_URL: http://gateway:8000/lesson-05
       AGENT_API_BASE_URL: http://gateway:8000/lesson-06
+      CONTEXT_API_BASE_URL: http://gateway:8000/lesson-07
     ports:
       - "${FRONT_PORT:-8500}:8501"
     depends_on:

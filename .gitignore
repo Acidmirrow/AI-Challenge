@@ -23,3 +23,7 @@ node_modules/
 # properties-файлы с токенами (в git едет только *.example)
 **/config/secrets.properties
 **/config/*.local.properties
+
+# Урок 07: локальная база контекста
+Lesson 07/app/data/*.db
+Lesson 07/app/data/*.db-*

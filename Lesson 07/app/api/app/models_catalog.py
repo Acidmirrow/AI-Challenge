@@ -1,0 +1,280 @@
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+from .config import Settings
+
+# Levels accepted by OpenAI-style `reasoning_effort`. DeepSeek/Anthropic-compatible
+# gateways may advertise more (none … max), so the catalog is the source of truth.
+DEFAULT_LEVELS = ("low", "medium", "high")
+
+
+@dataclass(frozen=True)
+class ModelInfo:
+    """One selectable model and what it actually supports."""
+
+    id: str
+    label: str
+    reasoning_levels: tuple[str, ...] = ()
+    supports_temperature: bool = True
+    supports_json_schema: bool = True
+    description: str = ""
+    provider: str = "mock"
+    #: размер модели для выбора «маленькая / средняя / большая» в уроке 05
+    tier: str = "medium"
+
+    @property
+    def supports_reasoning(self) -> bool:
+        return bool(self.reasoning_levels)
+
+    def as_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "label": self.label,
+            "supports_reasoning": self.supports_reasoning,
+            "supports_temperature": self.supports_temperature,
+            "supports_json_schema": self.supports_json_schema,
+            "reasoning_levels": list(self.reasoning_levels),
+            "description": self.description,
+            "provider": self.provider,
+            "tier": self.tier,
+        }
+
+
+# --- built-in catalogs -------------------------------------------------------
+# supports_temperature=False: GPT-5 / o-series style models reject any
+# temperature other than 1, so the API silently omits the parameter.
+
+MOCK_MODELS = [
+    ModelInfo("mock-fast", "Mock · fast", description="Офлайн-эхо без рассуждений",
+              provider="mock", tier="small"),
+    ModelInfo("mock-reasoner", "Mock · reasoner", DEFAULT_LEVELS,
+              description="Офлайн-модель с имитацией рассуждений", provider="mock",
+              tier="medium"),
+]
+
+OPENAI_MODELS = [
+    ModelInfo("gpt-5", "GPT-5", DEFAULT_LEVELS, supports_temperature=False,
+              description="Reasoning-модель, effort low/medium/high", provider="openai",
+              tier="large"),
+    ModelInfo("gpt-5-mini", "GPT-5 mini", DEFAULT_LEVELS, supports_temperature=False,
+              description="Удешевлённая reasoning-модель", provider="openai", tier="small"),
+    ModelInfo("o4-mini", "o4-mini", DEFAULT_LEVELS, supports_temperature=False,
+              description="Быстрая reasoning-модель", provider="openai", tier="medium"),
+    ModelInfo("gpt-4.1", "GPT-4.1", description="Универсальная модель, temperature доступна",
+              provider="openai", tier="medium"),
+    ModelInfo("gpt-4.1-mini", "GPT-4.1 mini", description="Небольшая универсальная модель",
+              provider="openai", tier="small"),
+]
+
+# DeepSeek V4 accepts reasoning_effort: none | minimal | low | medium | high |
+# xhigh | ultra | max (default high) and temperature 0…2; reasoning text comes
+# back in `reasoning_content`, which the provider forwards as SSE `reasoning`.
+DEEPSEEK_LEVELS = ("none", "minimal", "low", "medium", "high", "xhigh", "ultra", "max")
+
+DEEPSEEK_MODELS = [
+    ModelInfo("deepseek-flash", "DeepSeek V4.1 Flash", DEEPSEEK_LEVELS,
+              description="Быстрая модель DeepSeek: контекст 1M, текст и изображения",
+              provider="deepseek", supports_json_schema=False, tier="small"),
+    ModelInfo("deepseek-v4-pro", "DeepSeek V4 Pro", DEEPSEEK_LEVELS,
+              description="Старшая модель DeepSeek: контекст 1M, только текст",
+              provider="deepseek", supports_json_schema=False, tier="large"),
+]
+
+# --- бесплатные провайдеры ---------------------------------------------------
+# Ключ выдаётся без карты; лимит — на число запросов в сутки, а не на токены,
+# поэтому окно вывода у них широкое. Имена моделей у провайдеров меняются,
+# поэтому список берём из их /models, а не хардкодим id.
+
+CATALOGS = {
+    "mock": MOCK_MODELS,
+    "openai": OPENAI_MODELS,
+    "deepseek": DEEPSEEK_MODELS,
+}
+
+#: Провайдеры с бесплатным тарифом и правило отбора моделей из /models
+FREE_PROVIDER_RULES: dict[str, dict] = {
+    "gemini": {
+        "include": ("gemini-",),
+        "exclude": ("embedding", "embed", "tts", "image", "imagen", "veo", "live"),
+        "limit": 3,
+    },
+    "nous": {
+        "include": (":free",),
+        "exclude": ("embedding", "embed", "tts", "image", "audio", "moderation",
+                    "rerank", "guard"),
+        "limit": 4,
+    },
+    "openrouter": {
+        "include": (":free",),
+        "exclude": ("embedding", "safety", "guard", "moderation", "rerank", "whisper",
+                    "tts", "image", "audio", "code"),
+        # сначала известные чат-семейства, иначе берём самые короткие id
+        # порядок = приоритет: сначала модели, которые стабильно отвечают на free-тарифе
+        "prefer": ("nemotron-3.5-lightning", "nemotron", "gemma", "dots", "flint", "lfm",
+                   "north", "mistral", "llama", "gpt-oss", "qwen", "deepseek", "kimi"),
+        "limit": 3,
+    },
+}
+
+FREE_PROVIDERS = tuple(FREE_PROVIDER_RULES)
+
+
+#: Бесплатные модели OpenRouter на случай, если /models не отвечает (403/429).
+OPENROUTER_FALLBACK_MODELS: tuple[str, ...] = (
+    "nvidia/nemotron-3.5-lightning:free",
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "google/gemma-4-31b-it:free",
+)
+
+#: Бесплатные модели Nous Portal на случай, если его /models не отвечает.
+NOUS_FALLBACK_MODELS: tuple[str, ...] = (
+    "stepfun/step-3.7-flash:free",
+    "upstage/solar-mini4:free",
+    "meituan/longcat-2.5:free",
+    "reflection/beam-1.0-501b-a23b:free",
+)
+
+#: Запасные списки по провайдерам: живые модели из /models всегда важнее
+FALLBACK_MODELS: dict[str, tuple[str, ...]] = {
+    "nous": NOUS_FALLBACK_MODELS,
+    "openrouter": OPENROUTER_FALLBACK_MODELS,
+}
+
+#: Три группы размера моделей для урока 05
+TIERS = ("small", "medium", "large")
+
+#: Подсказки в имени модели, когда число параметров не указано
+TIER_HINTS = {
+    "small": ("flash", "mini", "lite", "small", "instant", "tiny", "nano"),
+    "large": ("pro", "ultra", "max", "large", "big", "opus", "sonnet", "heavy"),
+}
+
+_PARAMS_RE = re.compile(r"(\d+(?:\.\d+)?)b", re.IGNORECASE)
+
+
+def tier_from_name(model_id: str) -> str:
+    """Размер модели по имени: сначала число параметров, потом подсказки в названии.
+
+    У бесплатных провайдеров каталог приходит из их `/models`, поэтому «маленькая /
+    средняя / большая» определяется эвристикой: `…-8b-…` → small, `…-120b-…` → large.
+    Имя без числа — смотрим на слова: flash/mini → small, pro/ultra → large.
+    """
+    low = model_id.lower()
+    sizes = [float(match.group(1)) for match in _PARAMS_RE.finditer(low)]
+    if sizes:
+        biggest = max(sizes)
+        if biggest < 25:
+            return "small"
+        if biggest < 80:
+            return "medium"
+        return "large"
+    if any(token in low for token in TIER_HINTS["small"]):
+        return "small"
+    if any(token in low for token in TIER_HINTS["large"]):
+        return "large"
+    return "medium"
+
+
+def free_models_from(provider: str, remote_ids: list[str]) -> list[ModelInfo]:
+    """Отобрать бесплатные модели провайдера из его собственного /models."""
+    rule = FREE_PROVIDER_RULES.get(provider)
+    if not rule:
+        return []
+    prefer: tuple[str, ...] = rule.get("prefer") or ()
+
+    def rank(model_id: str) -> tuple[int, int, str]:
+        low = model_id.lower()
+        score = next((index for index, token in enumerate(prefer) if token in low), len(prefer))
+        return score, len(model_id), model_id
+
+    picked: list[str] = []
+    for model_id in sorted(set(remote_ids), key=rank):
+        low = model_id.lower()
+        if not any(token in low for token in rule["include"]):
+            continue
+        if any(token in low for token in rule["exclude"]):
+            continue
+        picked.append(model_id)
+        if len(picked) >= rule["limit"]:
+            break
+    if not picked and provider in FALLBACK_MODELS:
+        # /models не ответил — берём заранее известные бесплатные модели
+        picked = list(FALLBACK_MODELS[provider])
+    return [
+        ModelInfo(
+            model_id,
+            f"{_short_name(model_id)} (free)",
+            description=f"Бесплатный тариф {provider}",
+            provider=provider,
+            supports_json_schema=False,
+            tier=tier_from_name(model_id),
+        )
+        for model_id in picked
+    ]
+
+
+def _short_name(model_id: str) -> str:
+    """Человекочитаемое имя: путь и суффикс :free убираем."""
+    name = model_id.split("/")[-1].removesuffix(":free")
+    return name.replace("-", " ").replace("_", " ").title()
+
+
+def _from_file(path: str, default_provider: str) -> list[ModelInfo]:
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(raw, list):
+        raise ValueError("models json must be a list of objects")
+    models = []
+    for item in raw:
+        levels = item.get("reasoning_levels")
+        if levels is None:
+            levels = DEFAULT_LEVELS if item.get("supports_reasoning") else ()
+        models.append(
+            ModelInfo(
+                id=item["id"],
+                label=item.get("label", item["id"]),
+                reasoning_levels=tuple(levels),
+                supports_temperature=bool(item.get("supports_temperature", True)),
+                supports_json_schema=bool(item.get("supports_json_schema", True)),
+                description=item.get("description", ""),
+                provider=item.get("provider") or default_provider,
+                tier=item.get("tier") or tier_from_name(item["id"]),
+            )
+        )
+    return models
+
+
+class Catalog:
+    def __init__(self, models: list[ModelInfo]):
+        self._models = {m.id: m for m in models}
+        self._order = [m.id for m in models]
+
+    def all(self) -> list[ModelInfo]:
+        return [self._models[i] for i in self._order]
+
+    def get(self, model_id: str) -> ModelInfo | None:
+        return self._models.get(model_id)
+
+    def extend(self, models: list[ModelInfo]) -> None:
+        for model in models:
+            if model.id not in self._models:
+                self._models[model.id] = model
+                self._order.append(model.id)
+
+
+def build_catalog(settings: Settings) -> Catalog:
+    """Primary provider's models plus the offline mock ones.
+
+    The UI switches between "mock" and the real provider purely by picking a
+    model: every model carries the provider that can actually serve it.
+    """
+    if settings.models_json:
+        catalog = Catalog(_from_file(settings.models_json, settings.provider))
+    else:
+        catalog = Catalog(CATALOGS.get(settings.provider, OPENAI_MODELS))
+    if settings.provider != "mock":
+        catalog.extend(MOCK_MODELS)
+    return catalog
