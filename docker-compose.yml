@@ -70,6 +70,10 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
+  lesson-08-api:
+    build: ./Lesson 08/app/api
+    restart: unless-stopped
+
   gateway:
     build: ./gateway
     environment:
@@ -80,6 +84,7 @@ services:
       LESSON_05_URL: http://lesson-05-api:8000
       LESSON_06_URL: http://lesson-06-api:8000
       LESSON_07_URL: http://lesson-07-api:8000
+      LESSON_08_URL: http://lesson-08-api:8000
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -90,6 +95,7 @@ services:
       - lesson-05-api
       - lesson-06-api
       - lesson-07-api
+      - lesson-08-api
     healthcheck:
       test:
         - CMD
@@ -113,6 +119,7 @@ services:
       MODEL_API_BASE_URL: http://gateway:8000/lesson-05
       AGENT_API_BASE_URL: http://gateway:8000/lesson-06
       CONTEXT_API_BASE_URL: http://gateway:8000/lesson-07
+      TOKEN_API_BASE_URL: http://gateway:8000/lesson-08
     ports:
       - "${FRONT_PORT:-8500}:8501"
     depends_on:

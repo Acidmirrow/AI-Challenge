@@ -1,0 +1,35 @@
+name: token-lab
+
+services:
+  api:
+    build: ./api
+    ports:
+      - "${API_PORT:-8008}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).status == 200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  front:
+    build: ./front
+    environment:
+      TOKEN_API_BASE_URL: http://api:8000
+      CHAT_API_BASE_URL: ${CHAT_API_BASE_URL:-http://host.docker.internal:8000}
+      CONTEXT_API_BASE_URL: ${CONTEXT_API_BASE_URL:-http://host.docker.internal:8007}
+      AGENT_API_BASE_URL: ${AGENT_API_BASE_URL:-http://host.docker.internal:8006}
+      MODEL_API_BASE_URL: ${MODEL_API_BASE_URL:-http://host.docker.internal:8005}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${FRONT_PORT:-8508}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
