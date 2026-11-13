@@ -175,3 +175,12 @@ def test_ask_uses_summaries_when_compressed(client: TestClient) -> None:
     assert "4 850 000" in result["answer"]
     assert result["source_ids"]
     assert all(item >= 1001 for item in result["source_ids"])
+
+
+def test_chat_endpoint_answers_without_dialogue(client: TestClient) -> None:
+    result = client.post(
+        "/api/chat",
+        json={"messages": [{"role": "user", "content": "Привет"}]},
+    ).json()
+    assert result["answer"]
+    assert result["model"]

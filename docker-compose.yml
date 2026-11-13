@@ -76,6 +76,14 @@ services:
 
   lesson-09-api:
     build: ./Lesson 09/app/api
+    volumes:
+      - ./Lesson 06/app/config:/srv/config:ro
+    restart: unless-stopped
+
+  lesson-10-api:
+    build: ./Lesson 10/app/api
+    volumes:
+      - ./Lesson 06/app/config:/srv/config:ro
     restart: unless-stopped
 
   gateway:
@@ -90,6 +98,7 @@ services:
       LESSON_07_URL: http://lesson-07-api:8000
       LESSON_08_URL: http://lesson-08-api:8000
       LESSON_09_URL: http://lesson-09-api:8000
+      LESSON_10_URL: http://lesson-10-api:8000
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -102,6 +111,7 @@ services:
       - lesson-07-api
       - lesson-08-api
       - lesson-09-api
+      - lesson-10-api
     healthcheck:
       test:
         - CMD
@@ -127,6 +137,7 @@ services:
       CONTEXT_API_BASE_URL: http://gateway:8000/lesson-07
       TOKEN_API_BASE_URL: http://gateway:8000/lesson-08
       CONTROL_API_BASE_URL: http://gateway:8000/lesson-09
+      LESSON_10_API_BASE_URL: http://gateway:8000/lesson-10
     ports:
       - "${FRONT_PORT:-8500}:8501"
     depends_on:

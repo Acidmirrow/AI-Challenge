@@ -17,7 +17,7 @@ st.markdown(f"<style>{BASE_CSS}</style>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown('<div class="brand">AI <span>Challenge</span></div>', unsafe_allow_html=True)
-    st.markdown('<div class="brand-sub">урок 09 · управление контекстом</div>', unsafe_allow_html=True)
+    st.markdown('<div class="brand-sub">урок 09 · сжатие истории</div>', unsafe_allow_html=True)
     st.divider()
 
 control_page.render()

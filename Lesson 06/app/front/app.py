@@ -9,6 +9,7 @@ import streamlit as st
 import agent_page
 import chat_page
 import control_page
+import lesson10_page
 import context_page
 import format_page
 import model_page
@@ -111,7 +112,8 @@ SECTIONS = {
     "ИИ-агент (урок 06)": (agent_page, ""),
     "Сохранение контекста (урок 07)": (context_page, ""),
     "Работа с токенами (урок 08)": (token_page, ""),
-    "Управление контекстом (урок 09)": (control_page, ""),
+    "Управление контекстом: сжатие истории (урок 09)": (control_page, ""),
+    "Управление контекстом: Сравнение стратегий (урок 10)": (lesson10_page, ""),
 }
 
 
@@ -125,7 +127,7 @@ SECTIONS = dict(sorted(SECTIONS.items(), key=lambda item: _lesson_no(item[0])))
 
 with st.sidebar:
     st.markdown('<div class="brand">AI <span>Challenge</span></div>', unsafe_allow_html=True)
-    st.markdown('<div class="brand-sub">уроки 01–09 · один интерфейс</div>', unsafe_allow_html=True)
+    st.markdown('<div class="brand-sub">уроки 01–10 · один интерфейс</div>', unsafe_allow_html=True)
     # По умолчанию открываем последний урок; выбор пользователя сохраняется в сессии.
     if "nav_section" not in st.session_state:
         st.session_state["nav_section"] = list(SECTIONS)[-1]

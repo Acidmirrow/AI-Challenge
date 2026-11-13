@@ -1,0 +1,31 @@
+name: context-strategy-lab
+
+services:
+  api:
+    build: ./api
+    volumes:
+      - ../../Lesson 06/app/config:/srv/config:ro
+    ports:
+      - "${API_PORT:-8010}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).status == 200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  front:
+    build: ./front
+    environment:
+      LESSON_10_API_BASE_URL: http://api:8000
+    ports:
+      - "${FRONT_PORT:-8510}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

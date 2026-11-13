@@ -3,6 +3,8 @@ name: context-control-lab
 services:
   api:
     build: ./api
+    volumes:
+      - ../../Lesson 06/app/config:/srv/config:ro
     ports:
       - "${API_PORT:-8009}:8000"
     healthcheck:

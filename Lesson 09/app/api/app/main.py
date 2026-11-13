@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .context import STRATEGY_LABELS, build_context, build_summary_context
 from .dialogue import TITLE, demo_messages, demo_summaries
 from .history_chat import answer_question
+from .llm import chat as model_chat, chat_with_context
 from .schemas import (
     AskOut,
     AskRequest,
@@ -43,6 +44,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.post("/api/chat")
+async def chat(payload: dict) -> dict:
+    """Свободный чат с моделью до формирования диалога."""
+    messages = payload.get("messages") or []
+    answer, model = model_chat(messages)
+    return {"answer": answer, "model": model}
 
 
 @app.get("/api/health", response_model=HealthOut)
@@ -221,7 +230,11 @@ async def ask(payload: AskRequest) -> AskOut:
         )
     )
     answer, source_ids = answer_question(payload.question, selected.included)
-    if not source_ids:
+    context = "\n".join(item["content"] for item in selected.included)
+    model_answer, model = chat_with_context(payload.question, context)
+    if model != "fallback":
+        answer = model_answer
+    elif not source_ids:
         answer = _missing_answer(
             payload,
             selected,

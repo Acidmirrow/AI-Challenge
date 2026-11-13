@@ -1,4 +1,4 @@
-"""Страница «Управление контекстом» — урок 09."""
+"""Страница «Управление контекстом: сжатие истории» — урок 09."""
 
 from __future__ import annotations
 
@@ -6,20 +6,40 @@ from html import escape
 
 import httpx
 import streamlit as st
+import streamlit.components.v1 as components
 
 from common import CONTROL_API
 
-STRATEGIES = {
-    "budget": "Бюджет токенов",
-    "last": "Последние N сообщений",
-    "full": "Вся история",
-}
+# В уроке 09 стратегия не выбирается: до сжатия используется бюджет
+# последних сообщений, после — отдельные summary.
+CONTEXT_STRATEGY = "budget"
 
-STRATEGY_HINTS = {
-    "budget": "Набирает сообщения с конца диалога, пока хватает лимита сообщений и окна токенов. Старые сообщения отбрасываются.",
-    "last": "Берёт ровно последние N сообщений. Окно токенов показывает, помещается ли эта часть.",
-    "full": "Отправляет всю историю. Удобно проверить, помещается ли она в окно и что будет при переполнении.",
-}
+
+def _with_prechat(demo: dict, pre: list[dict]) -> dict:
+    if not pre:
+        return demo
+    offset = len(pre)
+    history = [
+        {
+            "id": index,
+            "role": item["role"],
+            "content": item["content"],
+            "tokens": max(1, len(item["content"]) // 4),
+        }
+        for index, item in enumerate(pre, 1)
+    ]
+    messages = history + [
+        {**item, "id": item["id"] + offset} for item in demo["messages"]
+    ]
+    summaries = [
+        {
+            **item,
+            "from_id": item["from_id"] + offset,
+            "to_id": item["to_id"] + offset,
+        }
+        for item in demo.get("summaries", [])
+    ]
+    return {**demo, "messages": messages, "summaries": summaries}
 
 
 def _demo() -> dict:
@@ -104,8 +124,11 @@ def _compress(messages: list[dict], summaries: list[dict], max_tokens: int, rese
 def _make_demo() -> None:
     # Диалог не кэшируем: сохраняем только факт, что он запрошен.
     demo = _demo()
+    pre = st.session_state.get("l09_empty_chat") or st.session_state.get("l09_pre_chat", [])
+    st.session_state["l09_pre_chat"] = pre
     st.session_state["l09_loaded"] = True
     st.session_state["l09_chat"] = []
+    st.session_state["l09_empty_chat"] = []
     st.session_state["l09_compressed"] = False
     st.session_state["l09_notice"] = (
         f"Диалог сформирован: {len(demo['messages'])} сообщений, "
@@ -180,6 +203,93 @@ def _render_messages(
                 st.write(summary["content"])
 
 
+def _chat_api(history: list[dict]) -> str:
+    with httpx.Client(timeout=45.0) as client:
+        response = client.post(
+            f"{CONTROL_API}/api/chat",
+            json={"messages": [{"role": item["role"], "content": item["content"]} for item in history]},
+        )
+    response.raise_for_status()
+    return response.json()["answer"]
+
+
+def _general_reply(text: str) -> str:
+    low = text.lower().strip()
+    if any(word in low for word in ("привет", "здравствуй", "добрый")):
+        return "Привет! Я готов помочь. Сформируйте диалог, и я смогу отвечать по его фактам."
+    if "спасибо" in low:
+        return "Пожалуйста! Если нужен ответ по проекту, сначала сформируйте диалог."
+    if "как дела" in low:
+        return "У меня всё готово. Сформируйте диалог — и можно задавать вопросы по нему."
+    if any(word in low for word in ("кто ты", "что ты умеешь")):
+        return "Я контекстный ИИ-помощник: отвечаю по фактам диалога. Сформируйте диалог, чтобы начать."
+    return (
+        "Принял сообщение и сохранил его в истории. "
+        "После формирования диалога смогу отвечать по его фактам."
+    )
+
+
+def _scroll_chat_to_bottom() -> None:
+    """Прокрутить историю чата к последнему сообщению."""
+    components.html(
+        """
+        <script>
+        const doc = window.parent.document;
+        const anchors = doc.querySelectorAll('.l09-chat-anchor');
+        const anchor = anchors[anchors.length - 1];
+        if (anchor) {
+            let box = anchor.parentElement;
+            while (box) {
+                if (box.scrollHeight > box.clientHeight + 2) {
+                    box.scrollTop = box.scrollHeight;
+                    break;
+                }
+                box = box.parentElement;
+            }
+        }
+        </script>
+        """,
+        height=0,
+    )
+
+
+def _render_empty_chat() -> None:
+    st.markdown("#### Чат с ИИ-моделью")
+    st.caption(
+        "Сообщение не создаёт диалог. Чтобы получать ответы по контексту, "
+        "сначала нажмите «Сформировать диалог»."
+    )
+    chat = st.session_state.setdefault("l09_empty_chat", [])
+    with st.container(height=360, border=True):
+        for entry in chat:
+            with st.chat_message(entry["role"], avatar="🧑" if entry["role"] == "user" else "🤖"):
+                st.markdown(entry["content"])
+        st.markdown('<div class="l09-chat-anchor"></div>', unsafe_allow_html=True)
+    _scroll_chat_to_bottom()
+    with st.form("l09_chat_empty_form", clear_on_submit=True):
+        question = st.text_input(
+            "Сообщение для ИИ-модели",
+            placeholder="Напишите сообщение…",
+            key="l09_chat_empty_text",
+        )
+        send_col, generate_col = st.columns(2)
+        with send_col:
+            submitted = st.form_submit_button("Отправить", use_container_width=True)
+        with generate_col:
+            generate = st.form_submit_button("Сформировать диалог", use_container_width=True)
+    if generate:
+        _make_demo()
+        st.rerun()
+    if submitted and question.strip():
+        chat.append({"role": "user", "content": question.strip()})
+        try:
+            answer = _chat_api(chat)
+        except Exception:  # noqa: BLE001
+            answer = _general_reply(question)
+        chat.append({"role": "assistant", "content": answer})
+        st.rerun()
+
+
 def _render_chat(
     messages: list[dict],
     summaries: list[dict],
@@ -188,49 +298,86 @@ def _render_chat(
     max_tokens: int,
     reserve: int,
     compressed: bool,
+    result: dict,
 ) -> None:
-    st.markdown("#### Чат по истории")
+    st.markdown("#### Чат с ИИ-моделью")
     st.caption(
         "Ответ строится только по тому, что попало в текущий контекст. "
         "При сжатии используются summary, а не полные сообщения. "
         "Каждый вопрос отправляется заново с пересобранным контекстом."
     )
     chat = st.session_state.setdefault("l09_chat", [])
-    for entry in chat:
-        with st.chat_message(entry["role"], avatar="🧑" if entry["role"] == "user" else "🤖"):
-            st.markdown(entry["content"])
-            sources = entry.get("sources") or []
-            if sources:
-                if entry.get("compressed"):
-                    labels = [f"summary №{item - 1000}" for item in sources if item >= 1000]
-                else:
-                    labels = [f"№{item}" for item in sources]
-                st.caption("Источники: " + ", ".join(labels))
-            elif entry["role"] == "assistant":
-                st.caption("Ответ без источника: факт не найден в выбранном контексте.")
-
-    question = st.chat_input("Спросите по истории диалога…", key="l09_question")
-    if question:
-        chat.append({"role": "user", "content": question})
+    with st.container(height=360, border=True):
+        _render_messages(messages, summaries, result, compressed)
+        for entry in chat:
+            with st.chat_message(entry["role"], avatar="🧑" if entry["role"] == "user" else "🤖"):
+                st.markdown(entry["content"])
+                sources = entry.get("sources") or []
+                if sources:
+                    if entry.get("compressed"):
+                        labels = [f"summary №{item - 1000}" for item in sources if item >= 1000]
+                    else:
+                        labels = [f"№{item}" for item in sources]
+                    st.caption("Источники: " + ", ".join(labels))
+                elif entry.get("mode") == "general":
+                    st.caption("Режим: общий вопрос к модели")
+                elif entry["role"] == "assistant":
+                    st.caption("Ответ без источника: факт не найден в выбранном контексте.")
+                if entry.get("mode") == "context":
+                    st.caption("Режим: только по контексту")
+        st.markdown('<div class="l09-chat-anchor"></div>', unsafe_allow_html=True)
+    _scroll_chat_to_bottom()
+    if st.session_state.pop("l09_clear_chat_text", False):
+        st.session_state["l09_chat_text"] = ""
+    with st.form("l09_chat_form", clear_on_submit=False):
+        question = st.text_input(
+            "Сообщение для ИИ-модели",
+            placeholder="Спросите по истории диалога…",
+            key="l09_chat_text",
+        )
+        send_col, mode_col = st.columns([1, 2])
+        with send_col:
+            submitted = st.form_submit_button("Отправить", use_container_width=True)
+        with mode_col:
+            context_only = st.toggle(
+                "Только по контексту",
+                value=True,
+                key="l09_context_only",
+                help="Выключите, чтобы задать общий вопрос модели без контекста диалога.",
+            )
+    if submitted and question.strip():
+        chat.append({"role": "user", "content": question.strip()})
         try:
-            answer = _ask(
-                messages,
-                summaries,
-                question,
-                strategy,
-                max_messages,
-                max_tokens,
-                reserve,
-                compressed,
-            )
-            chat.append(
-                {
-                    "role": "assistant",
-                    "content": answer["answer"],
-                    "sources": answer.get("source_ids") or [],
-                    "compressed": bool(answer.get("compressed")),
-                }
-            )
+            if context_only:
+                answer = _ask(
+                    messages,
+                    summaries,
+                    question,
+                    strategy,
+                    max_messages,
+                    max_tokens,
+                    reserve,
+                    compressed,
+                )
+                chat.append(
+                    {
+                        "role": "assistant",
+                        "content": answer["answer"],
+                        "sources": answer.get("source_ids") or [],
+                        "compressed": bool(answer.get("compressed")),
+                        "mode": "context",
+                    }
+                )
+            else:
+                chat.append(
+                    {
+                        "role": "assistant",
+                        "content": _chat_api(chat),
+                        "sources": [],
+                        "compressed": False,
+                        "mode": "general",
+                    }
+                )
         except Exception as exc:  # noqa: BLE001
             chat.append(
                 {
@@ -239,6 +386,7 @@ def _render_chat(
                     "sources": [],
                 }
             )
+        st.session_state["l09_clear_chat_text"] = True
         st.rerun()
 
 
@@ -285,8 +433,9 @@ def _render_dialogue(
 
     st.markdown("#### Сообщения")
     st.caption("Каждые 10 сообщений сворачиваются в отдельное summary — раскройте блок под десятым сообщением.")
-    _render_messages(messages, summaries, result, compressed)
-    _render_chat(messages, summaries, strategy, max_messages, max_tokens, reserve, compressed)
+    _render_chat(
+        messages, summaries, strategy, max_messages, max_tokens, reserve, compressed, result
+    )
 
 
 def _render_comparison(
@@ -366,51 +515,20 @@ def render() -> None:
     if st.session_state.get("l09_loaded"):
         try:
             # Каждый rerun — новый запрос к API, без кэша диалога.
-            demo = _demo()
+            demo = _with_prechat(_demo(), st.session_state.get("l09_pre_chat", []))
         except Exception as exc:  # noqa: BLE001
             load_error = f"{type(exc).__name__}: {exc}"
     messages = demo["messages"] if demo else []
     summaries = demo.get("summaries", []) if demo else []
 
     with st.sidebar:
-        st.markdown("#### Управление контекстом")
+        st.markdown("#### Сжатие истории")
         st.caption("Настройки применяются к текущему демо-диалогу.")
-        if st.button("Сформировать диалог", type="primary", use_container_width=True, key="l09_make"):
-            try:
-                _make_demo()
-                st.rerun()
-            except Exception as exc:  # noqa: BLE001
-                st.error(f"Не удалось сформировать диалог: {type(exc).__name__}: {exc}")
 
-        current_strategy = st.session_state.get("l09_strategy", "budget")
-        with st.popover(
-            f"Стратегия · {STRATEGIES.get(current_strategy, STRATEGIES['budget'])}",
-            use_container_width=True,
-        ):
-            st.caption("Выберите стратегию из списка")
-            strategy = st.radio(
-                "Стратегия",
-                options=list(STRATEGIES),
-                format_func=lambda value: STRATEGIES[value],
-                captions=[STRATEGY_HINTS[value] for value in STRATEGIES],
-                key="l09_strategy",
-                label_visibility="collapsed",
-            )
-        st.caption(STRATEGY_HINTS[strategy])
-
-        max_messages = _labeled_slider(
-            "Лимит сообщений", 2, 25, 12, 1, "l09_max_messages", "сообщений"
-        )
-        max_tokens = _labeled_slider(
-            "Окно контекста", 256, 8_000, 4_000, 128, "l09_max_tokens", "токенов"
-        )
-        reserve = _labeled_slider(
-            "Резерв под ответ", 0, 2_000, 500, 50, "l09_reserve", "токенов"
-        )
-
+        strategy = CONTEXT_STRATEGY
         compressed = bool(st.session_state.get("l09_compressed", False))
         if st.button(
-            "Вернуть полную историю" if compressed else "Сжать контекст",
+            "Вернуть полную историю" if compressed else "Сжать контекст (summary)",
             use_container_width=True,
             key="l09_compress",
             disabled=not messages,
@@ -422,6 +540,20 @@ def render() -> None:
                 else "Сжатие отключено: снова используется история сообщений."
             )
             st.rerun()
+        st.caption(
+            "До сжатия — последние сообщения в пределах лимита; "
+            "после — отдельные summary каждых 10 сообщений."
+        )
+
+        max_messages = _labeled_slider(
+            "Лимит сообщений", 2, 25, 12, 1, "l09_max_messages", "сообщений"
+        )
+        max_tokens = _labeled_slider(
+            "Окно контекста", 256, 8_000, 4_000, 128, "l09_max_tokens", "токенов"
+        )
+        reserve = _labeled_slider(
+            "Резерв под ответ", 0, 2_000, 500, 50, "l09_reserve", "токенов"
+        )
 
         result = None
         if messages:
@@ -455,6 +587,8 @@ def render() -> None:
         if st.button("Очистить диалог", use_container_width=True, key="l09_clear"):
             st.session_state.pop("l09_notice", None)
             st.session_state.pop("l09_chat", None)
+            st.session_state.pop("l09_empty_chat", None)
+            st.session_state.pop("l09_pre_chat", None)
             st.session_state["l09_loaded"] = False
             st.session_state["l09_compressed"] = False
             st.rerun()
@@ -463,17 +597,29 @@ def render() -> None:
         st.error(f"Не удалось получить диалог из API: {load_error}")
         return
 
-    st.title("Управление контекстом")
+    st.markdown(
+        """<style>
+        @media (max-width: 900px) {
+            [data-testid="stMain"] {
+                margin-left: 300px !important;
+                width: calc(100% - 300px) !important;
+                max-width: calc(100% - 300px) !important;
+            }
+        }
+        </style>""",
+        unsafe_allow_html=True,
+    )
+    st.title("Управление контекстом: сжатие истории")
     st.markdown(
         '<div class="l09-intro">Демонстрационный диалог на 25 сообщений. '
         "Каждые 10 сообщений имеют отдельное summary, последний блок — 5 сообщений; "
-        "кнопка «Сжать контекст» заменяет полную историю на summary и показывает "
+        "кнопка «Сжать контекст (summary)» заменяет полную историю на summary и показывает "
         "экономию токенов.</div>",
         unsafe_allow_html=True,
     )
-
     if not messages:
-        st.info("Нажмите **«Сформировать диалог»** в сайдбаре, чтобы начать.")
+        st.info("Нажмите **«Сформировать диалог»** ниже, чтобы начать.")
+        _render_empty_chat()
         return
 
     if result is None:
