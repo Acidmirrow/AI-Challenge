@@ -34,6 +34,23 @@ def _clean(value: str | None, limit: int = 500) -> str:
 
 TEST_PROFILES = (
     {
+        "owner_id": "demo",
+        "profile": {
+            "name": "Борис",
+            "role": "разработчик",
+            "city": "Москва",
+            "language": "русский",
+            "timezone": "Europe/Moscow",
+        },
+        "preferences": {
+            "style": "обращение на «ты»",
+            "format": "кратко",
+            "code_examples": "с примерами кода",
+            "emoji": "без emoji",
+            "constraints": "без воды",
+        },
+    },
+    {
         "owner_id": "test-alice",
         "profile": {"name": "Анна", "role": "аналитик", "city": "Москва", "language": "русский", "timezone": "Europe/Moscow"},
         "preferences": {
