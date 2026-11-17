@@ -1,4 +1,4 @@
-"""Общие части фронта уроков 01–11: адреса API, SSE-клиент, стили."""
+"""Общие части фронта уроков 01–12: адреса API, SSE-клиент, стили."""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ TOKEN_API = os.getenv("TOKEN_API_BASE_URL", "http://localhost:8008").rstrip("/")
 CONTROL_API = os.getenv("CONTROL_API_BASE_URL", "http://localhost:8009").rstrip("/")
 LESSON_10_API = os.getenv("LESSON_10_API_BASE_URL", "http://localhost:8010").rstrip("/")
 LESSON_11_API = os.getenv("LESSON_11_API_BASE_URL", "http://localhost:8011").rstrip("/")
+LESSON_12_API = os.getenv("LESSON_12_API_BASE_URL", "http://localhost:8012").rstrip("/")
 TIMEOUT = httpx.Timeout(300.0, connect=10.0)
 LAMP = "#ff9d3d"
 #: Провайдеры, которые не показываем во фронте (backend может их поддерживать)

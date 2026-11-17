@@ -98,6 +98,18 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
+  lesson-12-api:
+    build: ./Lesson 12/app/api
+    volumes:
+      - ./Lesson 06/app/config:/srv/config:ro
+      # Профиль и предпочтения урока 12 сохраняются между перезапусками.
+      - ./Lesson 12/app/data:/srv/data
+    environment:
+      PROFILE_DB_PATH: /srv/data/profile.db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
   gateway:
     build: ./gateway
     environment:
@@ -112,6 +124,7 @@ services:
       LESSON_09_URL: http://lesson-09-api:8000
       LESSON_10_URL: http://lesson-10-api:8000
       LESSON_11_URL: http://lesson-11-api:8000
+      LESSON_12_URL: http://lesson-12-api:8000
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -126,6 +139,7 @@ services:
       - lesson-09-api
       - lesson-10-api
       - lesson-11-api
+      - lesson-12-api
     healthcheck:
       test:
         - CMD
@@ -153,6 +167,7 @@ services:
       CONTROL_API_BASE_URL: http://gateway:8000/lesson-09
       LESSON_10_API_BASE_URL: http://gateway:8000/lesson-10
       LESSON_11_API_BASE_URL: http://gateway:8000/lesson-11
+      LESSON_12_API_BASE_URL: http://gateway:8000/lesson-12
     ports:
       - "${FRONT_PORT:-8500}:8501"
     depends_on:

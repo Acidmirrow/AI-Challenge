@@ -1,4 +1,4 @@
-"""Общий интерфейс AI Challenge: уроки 01–11 в одном Streamlit-приложении."""
+"""Общий интерфейс AI Challenge: уроки 01–12 в одном Streamlit-приложении."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ import memory_page
 import context_page
 import format_page
 import model_page
+import personalization_page
 import reasoning_page
 import temp_page
 import token_page
@@ -118,6 +119,7 @@ SECTIONS = {
     "Управление контекстом: сжатие истории (урок 09)": (control_page, ""),
     "Управление контекстом: Сравнение стратегий (урок 10)": (lesson10_page, ""),
     "Модель памяти ассистента (урок 11)": (memory_page, ""),
+    "Персонализация ассистента (урок 12)": (personalization_page, ""),
 }
 
 
@@ -135,7 +137,7 @@ WEEK_COUNT = 5
 
 with st.sidebar:
     st.markdown('<div class="brand">AI <span>Challenge</span></div>', unsafe_allow_html=True)
-    st.markdown('<div class="brand-sub">уроки 01–11 · один интерфейс</div>', unsafe_allow_html=True)
+    st.markdown('<div class="brand-sub">уроки 01–12 · один интерфейс</div>', unsafe_allow_html=True)
     # По умолчанию открываем последний урок; выбор пользователя сохраняется в сессии.
     if "nav_section" not in st.session_state:
         st.session_state["nav_section"] = list(SECTIONS)[-1]
