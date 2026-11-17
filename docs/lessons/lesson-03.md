@@ -175,7 +175,7 @@ curl -X POST http://localhost:8003/api/cross-check \
 
 ```json
 {
-  "model": "deepseek-flash",
+  "model": "deepseek-v4.1-flash",
   "messages": [{"role": "user", "content": "5 яблок, 3 груши, 2 апельсина…"}],
   "strategy": "cot",
   "temperature": 0.3,
@@ -187,7 +187,7 @@ curl -X POST http://localhost:8003/api/cross-check \
 События:
 
 ```
-event: start    {"strategy":"cot","strategy_label":"Пошаговые рассуждения (CoT)","model":"deepseek-flash", …}
+event: start    {"strategy":"cot","strategy_label":"Пошаговые рассуждения (CoT)","model":"deepseek-v4.1-flash", …}
 event: reasoning {"text":"…"}          # reasoning_content модели, если включён reasoning
 event: delta    {"text":"шаг 1…"}
 event: result   {"strategy":"cot","reasoning_part":"шаг 1…","answer_part":"Ответ: 12 фруктов.",

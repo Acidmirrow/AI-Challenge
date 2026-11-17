@@ -41,6 +41,7 @@ logger = logging.getLogger("context-lab.api")
 PROVIDER_LABELS = {
     "openai": "OpenAI",
     "deepseek": "DeepSeek",
+    "opencode-go": "OpenCode Go",
     "gemini": "Gemini",
     "openrouter": "OpenRouter",
     "nous": "Nous Portal",

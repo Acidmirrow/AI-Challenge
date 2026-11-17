@@ -4,4 +4,7 @@
 
 - [Обзор курса и уроки](docs/README.md)
 - [Краткое summary всех уроков](docs/LESSONS_SUMMARY.md)
-- [README уроков 01–09](docs/lessons/)
+- [Журнал принятых решений](docs/DECISIONS.md)
+- [Правила проекта](docs/RULES.md)
+- [Роль Memory Guardian](docs/ROLES.md)
+- [README уроков 01–11](docs/lessons/)

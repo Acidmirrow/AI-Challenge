@@ -232,7 +232,7 @@ async def ask(payload: AskRequest) -> AskOut:
     answer, source_ids = answer_question(payload.question, selected.included)
     context = "\n".join(item["content"] for item in selected.included)
     model_answer, model = chat_with_context(payload.question, context)
-    if model != "fallback":
+    if source_ids and model != "fallback":
         answer = model_answer
     elif not source_ids:
         answer = _missing_answer(

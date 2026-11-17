@@ -76,7 +76,7 @@ API: http://localhost:8006     # /api/health, /api/agent, /api/tools
 ```bash
 curl -s http://localhost:8006/api/agent \
   -H 'Content-Type: application/json' \
-  -d '{"prompt":"Посчитай 17 * 4","model":"deepseek-flash","max_steps":4}'
+  -d '{"prompt":"Посчитай 17 * 4","model":"deepseek-v4.1-flash","max_steps":4}'
 ```
 
 Ответ содержит `answer`, `steps[]` (инструмент, аргументы, наблюдение, время),

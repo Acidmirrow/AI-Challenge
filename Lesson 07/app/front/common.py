@@ -25,6 +25,7 @@ HIDDEN_PROVIDERS = {"gemini"}
 SOURCE_LABELS = {
     "mock": "Демо (mock)",
     "deepseek": "DeepSeek API",
+    "opencode-go": "OpenCode Go (подписка)",
     "openai": "OpenAI API",
     "openrouter": "OpenRouter",
     "nous": "Nous Portal",
@@ -32,6 +33,7 @@ SOURCE_LABELS = {
 #: подписи групп в попапе выбора модели
 PROVIDER_LABELS = {
     "deepseek": "DeepSeek API",
+    "opencode-go": "OpenCode Go · подписка",
     "openai": "OpenAI API",
     "openrouter": "OpenRouter · бесплатно",
     "nous": "Nous Portal · бесплатно",

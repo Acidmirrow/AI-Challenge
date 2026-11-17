@@ -80,10 +80,20 @@ DEEPSEEK_MODELS = [
 # поэтому окно вывода у них широкое. Имена моделей у провайдеров меняются,
 # поэтому список берём из их /models, а не хардкодим id.
 
+OPENCODE_GO_MODELS = [
+    ModelInfo("deepseek-v4.1-flash", "DeepSeek V4.1 Flash · OpenCode Go", DEEPSEEK_LEVELS,
+              description="Быстрая модель подписки OpenCode Go: чат и повседневные запросы",
+              provider="opencode-go", supports_json_schema=False),
+    ModelInfo("deepseek-v4-pro", "DeepSeek V4 Pro · OpenCode Go", DEEPSEEK_LEVELS,
+              description="Старшая модель подписки OpenCode Go: анализ и сложные задачи",
+              provider="opencode-go", supports_json_schema=False),
+]
+
 CATALOGS = {
     "mock": MOCK_MODELS,
     "openai": OPENAI_MODELS,
     "deepseek": DEEPSEEK_MODELS,
+    "opencode-go": OPENCODE_GO_MODELS,
 }
 
 #: Провайдеры с бесплатным тарифом и правило отбора моделей из /models

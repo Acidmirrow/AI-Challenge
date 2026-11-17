@@ -86,6 +86,18 @@ services:
       - ./Lesson 06/app/config:/srv/config:ro
     restart: unless-stopped
 
+  lesson-11-api:
+    build: ./Lesson 11/app/api
+    volumes:
+      - ./Lesson 06/app/config:/srv/config:ro
+      # Долговременная память урока 11 сохраняется между перезапусками.
+      - ./Lesson 11/app/data:/srv/data
+    environment:
+      MEMORY_DB_PATH: /srv/data/memory.db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
   gateway:
     build: ./gateway
     environment:
@@ -99,6 +111,7 @@ services:
       LESSON_08_URL: http://lesson-08-api:8000
       LESSON_09_URL: http://lesson-09-api:8000
       LESSON_10_URL: http://lesson-10-api:8000
+      LESSON_11_URL: http://lesson-11-api:8000
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -112,6 +125,7 @@ services:
       - lesson-08-api
       - lesson-09-api
       - lesson-10-api
+      - lesson-11-api
     healthcheck:
       test:
         - CMD
@@ -138,6 +152,7 @@ services:
       TOKEN_API_BASE_URL: http://gateway:8000/lesson-08
       CONTROL_API_BASE_URL: http://gateway:8000/lesson-09
       LESSON_10_API_BASE_URL: http://gateway:8000/lesson-10
+      LESSON_11_API_BASE_URL: http://gateway:8000/lesson-11
     ports:
       - "${FRONT_PORT:-8500}:8501"
     depends_on:

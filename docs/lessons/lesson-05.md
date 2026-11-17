@@ -41,7 +41,7 @@ curl http://localhost:8005/api/health
 
 Каждая модель в каталоге помечена размером — `small`, `medium`, `large`:
 
-- у известных моделей размер задан в каталоге (`deepseek-flash` → small,
+- у известных моделей размер задан в каталоге (`deepseek-v4.1-flash` → small,
   `deepseek-v4-pro` → large);
 - у бесплатных провайдеров размер выводится из имени: `…-8b-…` → small,
   `…-27b-…`/`…-31b-…` → medium, `…-120b-…`/`…-550b-…` → large;
@@ -58,7 +58,7 @@ curl http://localhost:8005/api/health
 
 `POST /api/compare` считает цену по прайсу `$ за 1 млн токенов`:
 
-- `deepseek-flash`, `deepseek-v4-pro` — из `config/pricing.properties`
+- `deepseek-v4.1-flash`, `deepseek-v4-pro` — из OpenCode Go; стоимость входит в подписку
   (файл в git, правится без перезапуска кода — читается при старте API);
 - `openrouter`, `gemini`, `nous`, `mock` — всегда `0` с пометкой
   «бесплатный провайдер»;

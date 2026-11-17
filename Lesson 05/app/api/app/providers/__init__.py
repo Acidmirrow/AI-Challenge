@@ -9,7 +9,7 @@ __all__ = ["Provider", "ProviderError", "ProviderRequest", "StreamEvent", "build
 
 
 #: Провайдеры с OpenAI-совместимым API (deepseek, gemini, openrouter — бесплатные тарифы)
-OPENAI_COMPATIBLE = ("openai", "deepseek", "gemini", "openrouter", "nous")
+OPENAI_COMPATIBLE = ("openai", "deepseek", "opencode-go", "gemini", "openrouter", "nous")
 
 
 def build_provider(settings: Settings, name: str | None = None) -> Provider:

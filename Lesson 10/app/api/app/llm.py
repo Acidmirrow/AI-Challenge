@@ -1,4 +1,4 @@
-"""Минимальный клиент DeepSeek для чата уроков 09/10.
+"""Минимальный клиент OpenCode Go для чата уроков 09/10.
 
 Ключ и base_url читаются только на сервере из смонтированных properties-файлов
 или переменных окружения. Если провайдер недоступен, возвращается безопасный
@@ -15,9 +15,9 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-DEFAULT_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
-PRO_MODEL = os.getenv("DEEPSEEK_PRO_MODEL", "deepseek-v4-pro")
-DEFAULT_BASE_URL = "https://api.deepseek.com/v1"
+DEFAULT_MODEL = os.getenv("OPENCODE_GO_MODEL", "deepseek-v4.1-flash")
+PRO_MODEL = os.getenv("OPENCODE_GO_PRO_MODEL", "deepseek-v4-pro")
+DEFAULT_BASE_URL = "https://opencode.ai/zen/go/v1"
 APP_FILE = Path(os.getenv("CONFIG_FILE", "/srv/config/app.properties"))
 SECRETS_FILE = Path(os.getenv("SECRETS_FILE", "/srv/config/secrets.properties"))
 
@@ -49,16 +49,18 @@ def _properties() -> dict[str, str]:
 
 def _credentials() -> tuple[str, str]:
     values = _properties()
-    key = os.getenv("DEEPSEEK_API_KEY", "").strip() or values.get("deepseek_api_key", "")
-    base = os.getenv("DEEPSEEK_BASE_URL", "").strip() or values.get(
-        "deepseek_base_url", DEFAULT_BASE_URL
+    key = os.getenv("OPENCODE_GO_API_KEY", "").strip() or values.get(
+        "opencode_go_api_key", ""
+    )
+    base = os.getenv("OPENCODE_GO_BASE_URL", "").strip() or values.get(
+        "opencode_go_base_url", DEFAULT_BASE_URL
     )
     return key, base.rstrip("/")
 
 
 def fallback_answer() -> str:
     return (
-        "DeepSeek сейчас недоступен. Проверьте ключ и соединение; "
+        "OpenCode Go сейчас недоступен. Проверьте ключ и соединение; "
         "после восстановления я смогу отвечать по диалогу."
     )
 
@@ -84,7 +86,7 @@ def chat(messages: list[dict[str, Any]], model: str | None = None) -> tuple[str,
         ],
         "temperature": 0.6,
         # reasoning-модель тратит часть лимита на reasoning_content
-        "max_tokens": 4_000 if selected_model == PRO_MODEL else 500,
+        "max_tokens": 4_000 if selected_model == PRO_MODEL else 1_200,
         "stream": False,
     }
     request = urllib.request.Request(
@@ -93,6 +95,11 @@ def chat(messages: list[dict[str, Any]], model: str | None = None) -> tuple[str,
         headers={
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "AIChallenge/1.0",
+            "HTTP-Referer": "https://ai-challenge.local",
+            "X-Title": "AI Challenge",
+            "x-opencode-session": "ai-challenge",
         },
         method="POST",
     )

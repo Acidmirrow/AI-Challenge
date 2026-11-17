@@ -29,6 +29,12 @@ class OpenAIProvider(Provider):
         self._settings = settings
         self._base_url = base_url
         extra: dict = {}
+        if self.name == "opencode-go":
+            extra["default_headers"] = {
+                "x-opencode-session": settings.opencode_go_session_id,
+                "HTTP-Referer": "https://ai-challenge.local",
+                "X-Title": "AI Challenge",
+            }
         if self.name == "nous" and settings.nous_host_header:
             # broker-прокси отказывает «чужим» Host: подставляем его loopback-имя
             extra["default_headers"] = {"Host": settings.nous_host_header}
@@ -143,6 +149,12 @@ class OpenAIProvider(Provider):
     async def list_remote_models(self) -> list[str]:
         url = self._base_url.rstrip("/") + "/models"
         headers = {"Authorization": f"Bearer {self._client.api_key}"}
+        if self.name == "opencode-go":
+            headers.update({
+                "x-opencode-session": self._settings.opencode_go_session_id,
+                "HTTP-Referer": "https://ai-challenge.local",
+                "X-Title": "AI Challenge",
+            })
         if self.name == "nous" and self._settings.nous_host_header:
             headers["Host"] = self._settings.nous_host_header
         async with httpx.AsyncClient(timeout=10) as client:

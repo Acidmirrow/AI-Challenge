@@ -30,10 +30,11 @@ class Settings(BaseSettings):
             PropertiesSource(settings_cls),
         )
 
-    # mock | openai | deepseek
-    #   mock     — офлайн-демо, ключ не нужен
-    #   openai   — любой OpenAI-совместимый endpoint (OpenAI, OpenRouter, vLLM, LM Studio, Ollama /v1)
-    #   deepseek — нативный DeepSeek API со своим каталогом моделей
+    # mock | openai | deepseek | opencode-go
+    #   mock         — офлайн-демо, ключ не нужен
+    #   openai       — любой OpenAI-совместимый endpoint
+    #   deepseek     — нативный DeepSeek API
+    #   opencode-go  — подписка OpenCode Go, модели deepseek-v4.1-flash / deepseek-v4-pro
     provider: str = "mock"
 
     openai_api_key: str = ""
@@ -41,6 +42,12 @@ class Settings(BaseSettings):
 
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com/v1"
+
+    # OpenCode Go: OpenAI-совместимый шлюз подписки.
+    # Запросы должны нести x-opencode-session, иначе relay вернёт MissingSessionID.
+    opencode_go_api_key: str = ""
+    opencode_go_base_url: str = "https://opencode.ai/zen/go/v1"
+    opencode_go_session_id: str = "ai-challenge"
 
     # Бесплатные провайдеры с OpenAI-совместимым API.
     # Оба дают бесплатный тариф: ключ выдаётся без карты.
@@ -90,6 +97,7 @@ class Settings(BaseSettings):
         mapping = {
             "openai": (self.openai_api_key, self.openai_base_url),
             "deepseek": (self.deepseek_api_key, self.deepseek_base_url),
+            "opencode-go": (self.opencode_go_api_key, self.opencode_go_base_url),
             "gemini": (self.gemini_api_key, self.gemini_base_url),
             "openrouter": (self.openrouter_api_key, self.openrouter_base_url),
             "nous": (self.nous_api_key, self.nous_base_url),
@@ -98,11 +106,19 @@ class Settings(BaseSettings):
 
     @property
     def api_key(self) -> str:
-        return self.deepseek_api_key if self.provider == "deepseek" else self.openai_api_key
+        if self.provider == "deepseek":
+            return self.deepseek_api_key
+        if self.provider == "opencode-go":
+            return self.opencode_go_api_key
+        return self.openai_api_key
 
     @property
     def base_url(self) -> str:
-        return self.deepseek_base_url if self.provider == "deepseek" else self.openai_base_url
+        if self.provider == "deepseek":
+            return self.deepseek_base_url
+        if self.provider == "opencode-go":
+            return self.opencode_go_base_url
+        return self.openai_base_url
 
     @property
     def provider_label(self) -> str:

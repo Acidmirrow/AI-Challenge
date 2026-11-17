@@ -98,4 +98,4 @@ def test_real_config_files_are_secret_free() -> None:
         pytest.skip("mounted config dir not available")
     text = committed.read_text(encoding="utf-8")
     assert "sk-" not in text
-    assert parse_properties(committed)["provider"] in {"mock", "openai", "deepseek"}
+    assert parse_properties(committed)["provider"] in {"mock", "openai", "deepseek", "opencode-go"}

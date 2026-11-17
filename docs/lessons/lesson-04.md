@@ -94,7 +94,7 @@ docker compose up -d --build
 ```bash
 curl -X POST http://localhost:8004/api/temperature/compare \
   -H 'Content-Type: application/json' \
-  -d '{"model": "deepseek-flash", "prompt": "Придумай 5 названий для кофейни у парка",
+  -d '{"model": "deepseek-v4.1-flash", "prompt": "Придумай 5 названий для кофейни у парка",
        "temperatures": [0, 0.7, 1.2], "repeats": 2, "max_tokens": 800}'
 ```
 
@@ -102,7 +102,7 @@ curl -X POST http://localhost:8004/api/temperature/compare \
 
 ```json
 {
-  "model": "deepseek-flash",
+  "model": "deepseek-v4.1-flash",
   "runs": [
     {"temperature": 0.0, "repeat": 0, "answer": "…", "usage": {"completion_tokens": 84}},
     {"temperature": 0.0, "repeat": 1, "answer": "…", "usage": {"completion_tokens": 86}},

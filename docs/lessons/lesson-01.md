@@ -183,7 +183,8 @@ curl -N -X POST http://localhost:8000/api/chat \
 |---|---|---|
 | `PROVIDER` | `mock` | `mock`, `openai` или `deepseek` |
 | `OPENAI_API_KEY` / `OPENAI_BASE_URL` | — | ключ и адрес OpenAI-совместимого шлюза |
-| `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE_URL` | — | ключ и адрес DeepSeek (профиль `deepseek`) |
+| `OPENCODE_GO_API_KEY` / `OPENCODE_GO_BASE_URL` | — | ключ и адрес OpenCode Go (профиль `opencode-go`) |
+| `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE_URL` | — | альтернативный прямой DeepSeek (профиль `deepseek`) |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | любой OpenAI-совместимый endpoint |
 | `REASONING_PARAM` | `reasoning_effort` | имя параметра reasoning; `""` — не отправлять |
 | `MAX_TOKENS_PARAM` | авто | `max_tokens` / `max_completion_tokens` |
@@ -199,7 +200,7 @@ curl -N -X POST http://localhost:8000/api/chat \
 
 ```json
 [
-  {"id": "deepseek-flash", "label": "DeepSeek V4.1 Flash", "reasoning_levels": ["none", "low", "high", "max"]},
+  {"id": "deepseek-v4.1-flash", "label": "DeepSeek V4.1 Flash · OpenCode Go", "reasoning_levels": ["none", "low", "high", "max"]},
   {"id": "qwen3-32b", "label": "Qwen3 32B", "supports_reasoning": true}
 ]
 ```

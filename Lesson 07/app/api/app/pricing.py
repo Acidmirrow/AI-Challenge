@@ -24,6 +24,8 @@ DEFAULT_PRICES: dict[str, tuple[float, float]] = {
 
 #: Провайдеры, у которых бесплатный тариф: стоимость всегда 0
 FREE_PROVIDERS = {"openrouter", "gemini", "nous", "mock"}
+#: Провайдеры по подписке: дополнительная стоимость запроса не считается
+SUBSCRIPTION_PROVIDERS = {"opencode-go"}
 
 
 def load_prices(path: str = "/srv/config/pricing.properties") -> dict[str, tuple[float, float]]:
@@ -63,6 +65,8 @@ def cost_of(
     """Стоимость прогона: (цена входа, цена выхода, стоимость $, пояснение)."""
     if provider in FREE_PROVIDERS:
         return 0.0, 0.0, 0.0, "бесплатный провайдер"
+    if provider in SUBSCRIPTION_PROVIDERS:
+        return 0.0, 0.0, 0.0, "входит в подписку OpenCode Go"
 
     price_in, price_out = prices.get(model_id, (0.0, 0.0))
     prompt_tokens = int(usage.get("prompt_tokens") or 0)

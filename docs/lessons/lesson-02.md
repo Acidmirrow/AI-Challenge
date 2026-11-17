@@ -247,7 +247,7 @@ curl -X POST http://localhost:8000/api/models/refresh
 ```json
 {
   "format": "json_object",
-  "model": "deepseek-flash",
+  "model": "deepseek-v4.1-flash",
   "prompt": "Матрица, 1999 год, рейтинг 8.7",
   "schema": {"type": "object", "properties": {"title": {"type": "string"}}},
   "schema_name": "movie",
@@ -263,7 +263,7 @@ curl -X POST http://localhost:8000/api/models/refresh
 События:
 
 ```
-event: start    {"format":"json_object","model":"deepseek-flash","notes":[]}
+event: start    {"format":"json_object","model":"deepseek-v4.1-flash","notes":[]}
 event: delta    {"kind":"text","text":"{\"title\": "}       # или kind="tool_args"
 event: run_result {"parse_check":{"ok":true,"kind":"json"},"validation":{"valid":true}}
 event: result   {"runs":1,"results":[{…}],"limit":{"truncated":false,"max_tokens":800},

@@ -59,7 +59,7 @@ class AnalyzeRequest(BaseModel):
 
 @app.post("/api/analyze")
 async def analyze(payload: AnalyzeRequest) -> dict:
-    """Развёрнутый анализ стратегий; для анализа используется deepseek-v4-pro."""
+    """Развёрнутый анализ стратегий; для анализа используется DeepSeek V4 Pro из OpenCode Go."""
     rows = payload.strategies
     prompt = (
         "Ты аналитик контекстного агента. Ниже результаты сравнения стратегий "
@@ -77,7 +77,7 @@ async def analyze(payload: AnalyzeRequest) -> dict:
     )
     if not answer.strip():
         answer = (
-            "Не удалось получить текст анализа от deepseek-v4-pro. "
+            "Не удалось получить текст анализа от DeepSeek V4 Pro (OpenCode Go). "
             "Сравнение стратегий доступно в таблице выше."
         )
     return {"analysis": answer, "model": model}

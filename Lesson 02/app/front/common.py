@@ -14,7 +14,7 @@ FORMAT_API = os.getenv("FORMAT_API_BASE_URL", "http://localhost:8002").rstrip("/
 TIMEOUT = httpx.Timeout(300.0, connect=10.0)
 LAMP = "#ff9d3d"
 
-SOURCE_LABELS = {"mock": "Демо (mock)", "deepseek": "DeepSeek API", "openai": "OpenAI API"}
+SOURCE_LABELS = {"mock": "Демо (mock)", "deepseek": "DeepSeek API", "openai": "OpenAI API", "opencode-go": "OpenCode Go (подписка)"}
 REASONING_LABELS = {
     "off": "Выключен",
     "none": "Без рассуждений",
@@ -126,6 +126,7 @@ def nixie_digits(text: str) -> str:
 PROVIDER_LABELS = {
     "mock": "Демо",
     "deepseek": "DeepSeek",
+    "opencode-go": "OpenCode Go · подписка",
     "openai": "OpenAI",
     "gemini": "Gemini",
     "openrouter": "OpenRouter",

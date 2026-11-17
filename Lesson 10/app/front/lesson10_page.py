@@ -680,7 +680,7 @@ def render() -> None:
     )
     if cached_analysis:
         st.markdown(st.session_state["l10_analysis"])
-        st.caption("Анализ: deepseek-v4-pro")
+        st.caption("Анализ: DeepSeek V4 Pro · OpenCode Go")
     else:
         st.info(
             "Развёрнутый вывод формируется по запросу, чтобы переключение веток "
@@ -692,7 +692,7 @@ def render() -> None:
             key="l10_analyze_button",
         ):
             try:
-                with st.spinner("deepseek-v4-pro формирует развёрнутый вывод…"):
+                with st.spinner("DeepSeek V4 Pro (OpenCode Go) формирует развёрнутый вывод…"):
                     text = _analyze(
                         rows,
                         branch_label,
@@ -706,7 +706,7 @@ def render() -> None:
                 st.rerun()
             except Exception as exc:  # noqa: BLE001
                 st.warning(
-                    f"Анализ deepseek-v4-pro недоступен: {type(exc).__name__}: {exc}"
+                    f"Анализ DeepSeek V4 Pro (OpenCode Go) недоступен: {type(exc).__name__}: {exc}"
                 )
 
     st.markdown("#### Выводы")

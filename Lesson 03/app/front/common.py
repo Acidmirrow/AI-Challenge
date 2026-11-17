@@ -18,6 +18,7 @@ LAMP = "#ff9d3d"
 SOURCE_LABELS = {
     "mock": "Демо (mock)",
     "deepseek": "DeepSeek API",
+    "opencode-go": "OpenCode Go (подписка)",
     "openai": "OpenAI API",
     "gemini": "Google Gemini",
     "openrouter": "OpenRouter",
@@ -26,6 +27,7 @@ SOURCE_LABELS = {
 #: подписи групп в попапе выбора модели
 PROVIDER_LABELS = {
     "deepseek": "DeepSeek API",
+    "opencode-go": "OpenCode Go · подписка",
     "openai": "OpenAI API",
     "gemini": "Google Gemini · бесплатно",
     "openrouter": "OpenRouter · бесплатно",
