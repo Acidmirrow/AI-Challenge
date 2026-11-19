@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
+import enter_submit
 import memory_page
 
 st.set_page_config(
@@ -12,4 +13,5 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+enter_submit.install()
 memory_page.render()

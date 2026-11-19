@@ -1,0 +1,36 @@
+name: task-state-lab
+
+services:
+  api:
+    build: ./api
+    volumes:
+      - ../../Lesson 06/app/config:/srv/config:ro
+      - ./data:/srv/data
+    environment:
+      # Отдельный файл: общий стек и изолированный запуск не должны
+      # открывать одну SQLite-базу из двух контейнеров одновременно.
+      TASK_DB_PATH: /srv/data/lesson13-isolated.db
+    ports:
+      - "${API_PORT:-8013}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).status == 200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  front:
+    build: ./front
+    environment:
+      LESSON_13_API_BASE_URL: http://api:8000
+    ports:
+      - "${FRONT_PORT:-8513}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

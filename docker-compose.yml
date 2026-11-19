@@ -110,6 +110,18 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
+  lesson-13-api:
+    build: ./Lesson 13/app/api
+    volumes:
+      - ./Lesson 06/app/config:/srv/config:ro
+      # Состояние задачи сохраняется между перезапусками.
+      - ./Lesson 13/app/data:/srv/data
+    environment:
+      TASK_DB_PATH: /srv/data/lesson13.db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
   gateway:
     build: ./gateway
     environment:
@@ -125,6 +137,7 @@ services:
       LESSON_10_URL: http://lesson-10-api:8000
       LESSON_11_URL: http://lesson-11-api:8000
       LESSON_12_URL: http://lesson-12-api:8000
+      LESSON_13_URL: http://lesson-13-api:8000
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -140,6 +153,7 @@ services:
       - lesson-10-api
       - lesson-11-api
       - lesson-12-api
+      - lesson-13-api
     healthcheck:
       test:
         - CMD
@@ -168,6 +182,7 @@ services:
       LESSON_10_API_BASE_URL: http://gateway:8000/lesson-10
       LESSON_11_API_BASE_URL: http://gateway:8000/lesson-11
       LESSON_12_API_BASE_URL: http://gateway:8000/lesson-12
+      LESSON_13_API_BASE_URL: http://gateway:8000/lesson-13
     ports:
       - "${FRONT_PORT:-8500}:8501"
     depends_on:
