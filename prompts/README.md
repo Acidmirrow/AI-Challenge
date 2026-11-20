@@ -9,6 +9,7 @@
 | Файл | Назначение | Основной контракт |
 |---|---|---|
 | `task-state-machine.system.md` | Формальный жизненный цикл задачи: этапы, действия, guards, пауза, история, tool-интеграция | `TaskStateMachine`, `TaskRepository`, API переходов |
+| `invariants.system.md` | Инварианты архитектуры, стека, хранения, секретов и MVP; отказ при конфликте и защита от обхода | `InvariantStore`, pre-check/post-check, команда изменения |
 | `profiling.system.md` | Профиль пользователя, предпочтения, границы роли, автообогащение и аудит | `ProfileStore`, `PreferenceStore`, контекст профиля |
 | `memory-model.system.md` | Трёхслойная память: краткосрочная, рабочая, долговременная | `MemoryStore`, TTL, provenance, retrieval |
 | `context-management.system.md` | Сборка контекста под бюджет токенов: окно, facts, summary, полная история | `ContextBuilder`, `ContextSnapshot` |

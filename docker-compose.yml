@@ -122,6 +122,17 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
+  lesson-14-api:
+    build: ./Lesson 14/app/api
+    volumes:
+      - ./Lesson 06/app/config:/srv/config:ro
+      - ./Lesson 14/app/data:/srv/data
+    environment:
+      INVARIANT_DB_PATH: /srv/data/lesson14.db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
   gateway:
     build: ./gateway
     environment:
@@ -138,6 +149,7 @@ services:
       LESSON_11_URL: http://lesson-11-api:8000
       LESSON_12_URL: http://lesson-12-api:8000
       LESSON_13_URL: http://lesson-13-api:8000
+      LESSON_14_URL: http://lesson-14-api:8000
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -154,6 +166,7 @@ services:
       - lesson-11-api
       - lesson-12-api
       - lesson-13-api
+      - lesson-14-api
     healthcheck:
       test:
         - CMD
@@ -183,6 +196,7 @@ services:
       LESSON_11_API_BASE_URL: http://gateway:8000/lesson-11
       LESSON_12_API_BASE_URL: http://gateway:8000/lesson-12
       LESSON_13_API_BASE_URL: http://gateway:8000/lesson-13
+      LESSON_14_API_BASE_URL: http://gateway:8000/lesson-14
     ports:
       - "${FRONT_PORT:-8500}:8501"
     depends_on:
