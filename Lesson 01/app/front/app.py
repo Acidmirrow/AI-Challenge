@@ -13,6 +13,7 @@ from typing import Iterator
 
 import httpx
 import streamlit as st
+import autoscroll
 
 API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
 TIMEOUT = httpx.Timeout(300.0, connect=10.0)
@@ -66,6 +67,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+autoscroll.install()
 
 st.markdown(
     f"""

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import streamlit as st
+import autoscroll
 
 import lesson13_page
 
@@ -12,4 +13,5 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+autoscroll.install()
 lesson13_page.render()

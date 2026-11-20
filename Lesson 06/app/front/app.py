@@ -1,4 +1,4 @@
-"""Общий интерфейс AI Challenge: уроки 01–14 в одном Streamlit-приложении."""
+"""Общий интерфейс AI Challenge: уроки 01–15 в одном Streamlit-приложении."""
 
 from __future__ import annotations
 
@@ -8,12 +8,14 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 import agent_page
+import autoscroll
 import chat_page
 import control_page
 import enter_submit
 import lesson10_page
 import lesson13_page
 import lesson14_page
+import lesson15_page
 import memory_page
 import context_page
 import format_page
@@ -30,6 +32,7 @@ st.set_page_config(
 )
 st.markdown(f"<style>{BASE_CSS}</style>", unsafe_allow_html=True)
 enter_submit.install()
+autoscroll.install()
 st.markdown(
     """<style>
     .week-label { display: flex; justify-content: space-between; align-items: baseline;
@@ -127,6 +130,7 @@ SECTIONS = {
     "Персонализация ассистента (урок 12)": (personalization_page, ""),
     "Состояние задачи (Task state machine) (урок 13)": (lesson13_page, ""),
     "Инварианты и ограничения состояния (урок 14)": (lesson14_page, ""),
+    "Устаревание и конфликты памяти (урок 15)": (lesson15_page, ""),
 }
 
 
@@ -144,7 +148,7 @@ WEEK_COUNT = 5
 
 with st.sidebar:
     st.markdown('<div class="brand">AI <span>Challenge</span></div>', unsafe_allow_html=True)
-    st.markdown('<div class="brand-sub">уроки 01–14 · один интерфейс</div>', unsafe_allow_html=True)
+    st.markdown('<div class="brand-sub">уроки 01–15 · один интерфейс</div>', unsafe_allow_html=True)
     # По умолчанию открываем последний урок; выбор пользователя сохраняется в сессии.
     if "nav_section" not in st.session_state:
         st.session_state["nav_section"] = list(SECTIONS)[-1]

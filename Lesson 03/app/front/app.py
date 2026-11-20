@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import streamlit as st
+import autoscroll
 
 import chat_page
 import format_page
@@ -10,6 +11,7 @@ import reasoning_page
 from common import BASE_CSS, CHAT_API, FORMAT_API, REASONING_API
 
 st.set_page_config(page_title="AI Challenge · UI", page_icon="🧠", layout="wide")
+autoscroll.install()
 st.markdown(f"<style>{BASE_CSS}</style>", unsafe_allow_html=True)
 
 SECTIONS = {

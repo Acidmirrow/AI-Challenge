@@ -36,6 +36,7 @@ def _upstreams() -> dict[str, str]:
         "lesson-12": "http://lesson-12-api:8000",
         "lesson-13": "http://lesson-13-api:8000",
         "lesson-14": "http://lesson-14-api:8000",
+        "lesson-15": "http://lesson-15-api:8000",
     }
     for lesson, value in default.items():
         override = os.getenv(f"{lesson.upper().replace('-', '_')}_URL", "")
@@ -61,6 +62,7 @@ TITLES = {
     "lesson-12": "Урок 12 — персонализация ассистента",
     "lesson-13": "Урок 13 — состояние задачи (Task state machine)",
     "lesson-14": "Урок 14 — инварианты и ограничения состояния",
+    "lesson-15": "Урок 15 — устаревание и конфликты памяти",
 }
 
 #: заголовки, которые нельзя пробрасывать как есть

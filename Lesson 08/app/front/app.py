@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import streamlit as st
+import autoscroll
 
 import token_page
 from common import BASE_CSS
@@ -13,6 +14,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+autoscroll.install()
 st.markdown(f"<style>{BASE_CSS}</style>", unsafe_allow_html=True)
 
 with st.sidebar:
