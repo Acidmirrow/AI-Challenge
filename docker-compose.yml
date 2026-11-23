@@ -144,6 +144,15 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
+  lesson-16-api:
+    build: ./Lesson 16/app/api
+    volumes:
+      - ./Lesson 16/app/config:/srv/config:ro
+      - ./Lesson 16/app/data:/srv/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
   gateway:
     build: ./gateway
     environment:
@@ -162,6 +171,7 @@ services:
       LESSON_13_URL: http://lesson-13-api:8000
       LESSON_14_URL: http://lesson-14-api:8000
       LESSON_15_URL: http://lesson-15-api:8000
+      LESSON_16_URL: http://lesson-16-api:8000
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -180,6 +190,7 @@ services:
       - lesson-13-api
       - lesson-14-api
       - lesson-15-api
+      - lesson-16-api
     healthcheck:
       test:
         - CMD
@@ -193,7 +204,7 @@ services:
     restart: unless-stopped
 
   front:
-    build: ./Lesson 06/app/front
+    build: ./shared_front
     environment:
       # Один адрес на все уроки — шлюз разводит их по префиксам.
       CHAT_API_BASE_URL: http://gateway:8000/lesson-01
@@ -211,6 +222,7 @@ services:
       LESSON_13_API_BASE_URL: http://gateway:8000/lesson-13
       LESSON_14_API_BASE_URL: http://gateway:8000/lesson-14
       LESSON_15_API_BASE_URL: http://gateway:8000/lesson-15
+      LESSON_16_API_BASE_URL: http://gateway:8000/lesson-16
     ports:
       - "${FRONT_PORT:-8500}:8501"
     depends_on:
