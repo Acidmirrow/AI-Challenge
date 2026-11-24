@@ -17,6 +17,7 @@ import lesson13_page
 import lesson14_page
 import lesson15_page
 import lesson16_page
+import lesson17_page
 import memory_page
 import context_page
 import format_page
@@ -133,6 +134,7 @@ SECTIONS = {
     "Инварианты и ограничения состояния (урок 14)": (lesson14_page, ""),
     "Устаревание и конфликты памяти (урок 15)": (lesson15_page, ""),
     "Подключение MCP (урок 16)": (lesson16_page, ""),
+    "Первый инструмент MCP (урок 17)": (lesson17_page, ""),
 }
 
 
@@ -150,7 +152,7 @@ WEEK_COUNT = 5
 
 with st.sidebar:
     st.markdown('<div class="brand">AI <span>Challenge</span></div>', unsafe_allow_html=True)
-    st.markdown('<div class="brand-sub">уроки 01–16 · один интерфейс</div>', unsafe_allow_html=True)
+    st.markdown('<div class="brand-sub">уроки 01–17 · один интерфейс</div>', unsafe_allow_html=True)
     # По умолчанию открываем последний урок; выбор пользователя сохраняется в сессии.
     if "nav_section" not in st.session_state:
         st.session_state["nav_section"] = list(SECTIONS)[-1]

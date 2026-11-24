@@ -1,4 +1,4 @@
-# AI Challenge — уроки 01–16
+# AI Challenge — уроки 01–17
 
 Учебный проект: каждый урок — отдельное приложение (FastAPI + Streamlit), но весь
 курс открывается **с одного хоста и одного порта**.
@@ -20,14 +20,14 @@
 
 ```
 UI:   http://localhost:8500     # общий интерфейс, разделы всех уроков
-API:  http://localhost:8000     # шлюз: /lesson-01/api/..., … /lesson-16/api/...
+API:  http://localhost:8000     # шлюз: /lesson-01/api/..., … /lesson-17/api/...
 ```
 
-Уроки 01–16 реализованы; при переключении урока экран начинается с заголовка раздела; урок 11 показывает трёхслойную модель памяти, урок 12 — профиль и проверку профилей, урок 13 реализует формальный Task State Machine с guards, SQLite, паузой и визуальным stepper, урок 14 — инварианты с pre-check/post-check кодом и историей изменений; урок 16 — чат с встроенными инструментами и YouGile через MCP (отдельная вкладка недели 4).
+Уроки 01–17 реализованы; при переключении урока экран начинается с заголовка раздела; урок 11 показывает трёхслойную модель памяти, урок 12 — профиль и проверку профилей, урок 13 реализует формальный Task State Machine с guards, SQLite, паузой и визуальным stepper, урок 14 — инварианты с pre-check/post-check кодом и историей изменений; урок 16 — чат с встроенными инструментами и YouGile через MCP (отдельная вкладка недели 4).
 
 Подробные README уроков: [01](lessons/lesson-01.md) · [02](lessons/lesson-02.md) ·
 [03](lessons/lesson-03.md) · [04](lessons/lesson-04.md) · [05](lessons/lesson-05.md) ·
-[06](lessons/lesson-06.md) · [07](lessons/lesson-07.md) · [08](lessons/lesson-08.md) · [09](lessons/lesson-09.md) · [10](lessons/lesson-10.md) · [11](lessons/lesson-11.md) · [12](lessons/lesson-12.md) · [13](lessons/lesson-13.md) · [14](lessons/lesson-14.md) · [15](lessons/lesson-15.md) · [16](lessons/lesson-16.md).
+[06](lessons/lesson-06.md) · [07](lessons/lesson-07.md) · [08](lessons/lesson-08.md) · [09](lessons/lesson-09.md) · [10](lessons/lesson-10.md) · [11](lessons/lesson-11.md) · [12](lessons/lesson-12.md) · [13](lessons/lesson-13.md) · [14](lessons/lesson-14.md) · [15](lessons/lesson-15.md) · [16](lessons/lesson-16.md) · [17](lessons/lesson-17.md).
 
 ## Что реализовано
 
@@ -49,6 +49,7 @@ API:  http://localhost:8000     # шлюз: /lesson-01/api/..., … /lesson-16/a
 | 14 | Инварианты и ограничения состояния | инварианты архитектуры, стека, хранения, секретов и MVP, отдельное SQLite-хранилище, pre-check и post-check кодом, отказ с объяснением, явная команда изменения с историей, 9 попыток обхода (1 намеренно не исправлен) | 8 |
 | 15 | Устаревание и конфликты памяти | правила replace/append, замена конфликтующего факта с логом «было → стало», время записи, приоритет новых значений, проверка промпта на старые значения, очистка рабочей памяти при сохранении фактов, сценарий 4 изменений, вкладка сценариев добавления для append | 10 |
 | 16 | Подключение MCP | чат с встроенными MCP-инструментами (9, stdio) и YouGile (47, HTTP/OAuth), отдельная вкладка недели 4 | 8 |
+| 17 | Первый инструмент MCP | собственный MCP-сервер вокруг mock CRM API: get_customer, list_customers, create_customer, delete_customer; ряд кнопок, форма добавления, удаление красным | 10 |
 
 Общий интерфейс (порт 8500) — это фронт урока 06: в сайдбаре разделы
 «Чат (урок 01)» / «Форматы ответа (урок 02)» / «Способы рассуждений (урок 03)» /
@@ -86,6 +87,7 @@ Lesson 13/app/            # состояние задачи: FSM + SQLite + step
 Lesson 14/app/            # инварианты и проверка кодом
 Lesson 15/app/            # память: replace/append и конфликты
 Lesson 16/app/            # MCP-чат: встроенный stdio и YouGile
+Lesson 17/app/            # первый инструмент MCP: mock CRM + 4 инструмента
 ```
 
 Логика каждого урока живёт **в своей папке**: у него собственные `app/api/app/*`,
@@ -111,6 +113,7 @@ Lesson 16/app/            # MCP-чат: встроенный stdio и YouGile
 | API урока 14 | `http://localhost:8000/lesson-14/api/health` | `lesson-14-api:8000` |
 | API урока 15 | `http://localhost:8000/lesson-15/api/health` | `lesson-15-api:8000` |
 | API урока 16 | `http://localhost:8000/lesson-16/api/health` | `lesson-16-api:8000` |
+| API урока 17 | `http://localhost:8000/lesson-17/api/health` | `lesson-17-api:8000` |
 | Общий UI | `http://localhost:8500` | `front:8501` |
 
 Шлюз (`gateway/`) отдаёт:
@@ -194,7 +197,7 @@ for s in lesson-01-api lesson-02-api lesson-03-api lesson-04-api lesson-05-api l
 done
 ```
 
-Результат на текущей ветке: 63 / 43 / 30 / 17 / 44 / 60 / 21 / 15 / 19 / 8 / 16 / 23 / 28 / 8 / 10 / 8.
+Результат на текущей ветке: 63 / 43 / 30 / 17 / 44 / 60 / 21 / 15 / 19 / 8 / 16 / 23 / 28 / 8 / 10 / 8 / 10.
 
 ## Отдельная работа над одним уроком
 
