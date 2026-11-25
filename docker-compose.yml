@@ -159,6 +159,16 @@ services:
       - ./Lesson 17/app/config:/srv/config:ro
     restart: unless-stopped
 
+  lesson-18-api:
+    build: ./Lesson 18/app/api
+    volumes:
+      - ./Lesson 18/app/config:/srv/config:ro
+      # Снимки и отчёты планировщика переживают перезапуск контейнера.
+      - ./Lesson 18/app/data:/srv/data
+    environment:
+      SCHEDULER_DB_PATH: /srv/data/lesson18.db
+    restart: unless-stopped
+
   gateway:
     build: ./gateway
     environment:
@@ -179,6 +189,7 @@ services:
       LESSON_15_URL: http://lesson-15-api:8000
       LESSON_16_URL: http://lesson-16-api:8000
       LESSON_17_URL: http://lesson-17-api:8000
+      LESSON_18_URL: http://lesson-18-api:8000
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -199,6 +210,7 @@ services:
       - lesson-15-api
       - lesson-16-api
       - lesson-17-api
+      - lesson-18-api
     healthcheck:
       test:
         - CMD
@@ -232,6 +244,7 @@ services:
       LESSON_15_API_BASE_URL: http://gateway:8000/lesson-15
       LESSON_16_API_BASE_URL: http://gateway:8000/lesson-16
       LESSON_17_API_BASE_URL: http://gateway:8000/lesson-17
+      LESSON_18_API_BASE_URL: http://gateway:8000/lesson-18
     ports:
       - "${FRONT_PORT:-8500}:8501"
     depends_on:

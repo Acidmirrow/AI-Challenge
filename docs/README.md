@@ -1,4 +1,4 @@
-# AI Challenge — уроки 01–17
+# AI Challenge — уроки 01–18
 
 Учебный проект: каждый урок — отдельное приложение (FastAPI + Streamlit), но весь
 курс открывается **с одного хоста и одного порта**.
@@ -20,14 +20,14 @@
 
 ```
 UI:   http://localhost:8500     # общий интерфейс, разделы всех уроков
-API:  http://localhost:8000     # шлюз: /lesson-01/api/..., … /lesson-17/api/...
+API:  http://localhost:8000     # шлюз: /lesson-01/api/..., … /lesson-18/api/...
 ```
 
-Уроки 01–17 реализованы; при переключении урока экран начинается с заголовка раздела; урок 11 показывает трёхслойную модель памяти, урок 12 — профиль и проверку профилей, урок 13 реализует формальный Task State Machine с guards, SQLite, паузой и визуальным stepper, урок 14 — инварианты с pre-check/post-check кодом и историей изменений; урок 16 — чат с встроенными инструментами и YouGile через MCP (отдельная вкладка недели 4).
+Уроки 01–18 реализованы; при переключении урока экран начинается с заголовка раздела; урок 11 показывает трёхслойную модель памяти, урок 12 — профиль и проверку профилей, урок 13 реализует формальный Task State Machine с guards, SQLite, паузой и визуальным stepper, урок 14 — инварианты с pre-check/post-check кодом и историей изменений; урок 16 — чат с встроенными инструментами и YouGile через MCP; урок 18 — фоновый планировщик с MCP, SQLite и агрегированными отчётами.
 
 Подробные README уроков: [01](lessons/lesson-01.md) · [02](lessons/lesson-02.md) ·
 [03](lessons/lesson-03.md) · [04](lessons/lesson-04.md) · [05](lessons/lesson-05.md) ·
-[06](lessons/lesson-06.md) · [07](lessons/lesson-07.md) · [08](lessons/lesson-08.md) · [09](lessons/lesson-09.md) · [10](lessons/lesson-10.md) · [11](lessons/lesson-11.md) · [12](lessons/lesson-12.md) · [13](lessons/lesson-13.md) · [14](lessons/lesson-14.md) · [15](lessons/lesson-15.md) · [16](lessons/lesson-16.md) · [17](lessons/lesson-17.md).
+[06](lessons/lesson-06.md) · [07](lessons/lesson-07.md) · [08](lessons/lesson-08.md) · [09](lessons/lesson-09.md) · [10](lessons/lesson-10.md) · [11](lessons/lesson-11.md) · [12](lessons/lesson-12.md) · [13](lessons/lesson-13.md) · [14](lessons/lesson-14.md) · [15](lessons/lesson-15.md) · [16](lessons/lesson-16.md) · [17](lessons/lesson-17.md) · [18](lessons/lesson-18.md).
 
 ## Что реализовано
 
@@ -50,6 +50,7 @@ API:  http://localhost:8000     # шлюз: /lesson-01/api/..., … /lesson-17/a
 | 15 | Устаревание и конфликты памяти | правила replace/append, замена конфликтующего факта с логом «было → стало», время записи, приоритет новых значений, проверка промпта на старые значения, очистка рабочей памяти при сохранении фактов, сценарий 4 изменений, вкладка сценариев добавления для append | 10 |
 | 16 | Подключение MCP | чат с встроенными MCP-инструментами (9, stdio) и YouGile (47, HTTP/OAuth), отдельная вкладка недели 4 | 8 |
 | 17 | Первый инструмент MCP | собственный MCP-сервер вокруг mock CRM API: get_customer, list_customers, create_customer, delete_customer; ряд кнопок, форма добавления, удаление красным | 10 |
+| 18 | Планировщик и фоновые задачи | фоновый asyncio-цикл, MCP-инструменты fetch_metrics / save_snapshot / read_snapshots, SQLite-накопление с лимитом 500, отчёт по всем запускам периода, очистка результатов | 9 |
 
 Общий интерфейс (порт 8500) — это фронт урока 06: в сайдбаре разделы
 «Чат (урок 01)» / «Форматы ответа (урок 02)» / «Способы рассуждений (урок 03)» /
@@ -58,9 +59,11 @@ API:  http://localhost:8000     # шлюз: /lesson-01/api/..., … /lesson-17/a
 «Управление контекстом: сжатие истории (урок 09)» /
 «Управление контекстом: Сравнение стратегий (урок 10)» /
 «Модель памяти ассистента (урок 11)» / «Персонализация ассистента (урок 12)» /
-«Состояние задачи (Task state machine) (урок 13)» / «Инварианты и ограничения состояния (урок 14)»; урок 16 открывается вкладкой «Подключение MCP (урок 16)» в неделе 4, с переключателем недель
+«Состояние задачи (Task state machine) (урок 13)» / «Инварианты и ограничения состояния (урок 14)» /
+«Устаревание и конфликты памяти (урок 15)» / «Подключение MCP (урок 16)» /
+«Первый инструмент MCP (урок 17)» / «Планировщик и фоновые задачи (урок 18)»; урок 16 открывается вкладкой «Подключение MCP (урок 16)» в неделе 4, с переключателем недель
 в одну строку **1–5**: 01–05 — неделя 1 (пройдена), 06–10 — неделя 2 (пройдена),
-11–15 — неделя 3 (текущая), 16–20 — неделя 4 (скоро), 21–25 — неделя 5 (скоро).
+11–15 — неделя 3 (пройдена), 16–20 — неделя 4 (текущая), 21–25 — неделя 5 (скоро).
 Ниже видны только уроки выбранной недели; по умолчанию открывается последний урок;
 для будущих недель показывается заглушка. Раздел урока 05 — две вкладки: «Чат» и
 «Сравнение моделей».
@@ -68,7 +71,7 @@ API:  http://localhost:8000     # шлюз: /lesson-01/api/..., … /lesson-17/a
 ## Как это устроено
 
 ```
-docker-compose.yml        # единственный стек: 16 API + шлюз + один фронт
+docker-compose.yml        # единственный стек: 18 API + шлюз + один фронт
 gateway/                  # прокси: разводит /lesson-0X/api/* по сервисам
 Lesson 01/app/            # код урока 01: api/ (FastAPI) + front/ (страницы) + config/
 Lesson 02/app/            # код урока 02 — отдельно, ничего общего с уроком 01
@@ -76,7 +79,7 @@ Lesson 03/app/
 Lesson 04/app/
 Lesson 05/app/
 Lesson 06/app/            # только API и фронт урока 06
-shared_front/             # общий фронт уроков 01–16
+shared_front/             # общий фронт уроков 01–18
 Lesson 07/app/            # сохранение контекста: API + SQLite + отдельный фронт
 Lesson 08/app/            # работа с токенами: API + отдельный фронт
 Lesson 09/app/            # управление контекстом: API + отдельный фронт
@@ -88,6 +91,7 @@ Lesson 14/app/            # инварианты и проверка кодом
 Lesson 15/app/            # память: replace/append и конфликты
 Lesson 16/app/            # MCP-чат: встроенный stdio и YouGile
 Lesson 17/app/            # первый инструмент MCP: mock CRM + 4 инструмента
+Lesson 18/app/            # планировщик: MCP + SQLite + отчёты
 ```
 
 Логика каждого урока живёт **в своей папке**: у него собственные `app/api/app/*`,
@@ -114,6 +118,7 @@ Lesson 17/app/            # первый инструмент MCP: mock CRM + 4 
 | API урока 15 | `http://localhost:8000/lesson-15/api/health` | `lesson-15-api:8000` |
 | API урока 16 | `http://localhost:8000/lesson-16/api/health` | `lesson-16-api:8000` |
 | API урока 17 | `http://localhost:8000/lesson-17/api/health` | `lesson-17-api:8000` |
+| API урока 18 | `http://localhost:8000/lesson-18/api/health` | `lesson-18-api:8000` |
 | Общий UI | `http://localhost:8500` | `front:8501` |
 
 Шлюз (`gateway/`) отдаёт:
@@ -192,12 +197,12 @@ open http://localhost:8500        # macOS
 ## Тесты
 
 ```bash
-for s in lesson-01-api lesson-02-api lesson-03-api lesson-04-api lesson-05-api lesson-06-api lesson-07-api lesson-08-api lesson-09-api lesson-10-api lesson-11-api lesson-12-api lesson-13-api; do
+for s in lesson-01-api lesson-02-api lesson-03-api lesson-04-api lesson-05-api lesson-06-api lesson-07-api lesson-08-api lesson-09-api lesson-10-api lesson-11-api lesson-12-api lesson-13-api lesson-14-api lesson-15-api lesson-16-api lesson-17-api lesson-18-api; do
   docker compose run --rm --entrypoint python "$s" -m pytest -q
 done
 ```
 
-Результат на текущей ветке: 63 / 43 / 30 / 17 / 44 / 60 / 21 / 15 / 19 / 8 / 16 / 23 / 28 / 8 / 10 / 8 / 10.
+Результат на текущей ветке: 63 / 43 / 30 / 17 / 44 / 60 / 21 / 15 / 19 / 8 / 16 / 23 / 28 / 8 / 10 / 8 / 10 / 9.
 
 ## Отдельная работа над одним уроком
 

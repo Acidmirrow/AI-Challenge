@@ -27,3 +27,7 @@ node_modules/
 # Урок 07: локальная база контекста
 Lesson 07/app/data/*.db
 Lesson 07/app/data/*.db-*
+
+# Урок 18: накопленные снимки и отчёты планировщика
+Lesson 18/app/data/*.db
+Lesson 18/app/data/*.db-*

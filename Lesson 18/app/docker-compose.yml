@@ -1,0 +1,30 @@
+name: scheduler-background-lab
+
+services:
+  api:
+    build: ./api
+    volumes:
+      - ./config:/srv/config:ro
+      - ./data:/srv/data
+    environment:
+      SCHEDULER_DB_PATH: /srv/data/lesson18-isolated.db
+    ports:
+      - "${API_PORT:-8018}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  front:
+    build: ./front
+    environment:
+      LESSON_18_API_BASE_URL: http://api:8000
+    ports:
+      - "${FRONT_PORT:-8518}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
