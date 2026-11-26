@@ -169,6 +169,14 @@ services:
       SCHEDULER_DB_PATH: /srv/data/lesson18.db
     restart: unless-stopped
 
+  lesson-19-api:
+    build: ./Lesson 19/app/api
+    volumes:
+      - ./Lesson 19/app/data:/srv/data
+    environment:
+      PIPELINE_OUTPUT_DIR: /srv/data/output
+    restart: unless-stopped
+
   gateway:
     build: ./gateway
     environment:
@@ -190,6 +198,7 @@ services:
       LESSON_16_URL: http://lesson-16-api:8000
       LESSON_17_URL: http://lesson-17-api:8000
       LESSON_18_URL: http://lesson-18-api:8000
+      LESSON_19_URL: http://lesson-19-api:8000
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -211,6 +220,7 @@ services:
       - lesson-16-api
       - lesson-17-api
       - lesson-18-api
+      - lesson-19-api
     healthcheck:
       test:
         - CMD
@@ -245,6 +255,7 @@ services:
       LESSON_16_API_BASE_URL: http://gateway:8000/lesson-16
       LESSON_17_API_BASE_URL: http://gateway:8000/lesson-17
       LESSON_18_API_BASE_URL: http://gateway:8000/lesson-18
+      LESSON_19_API_BASE_URL: http://gateway:8000/lesson-19
     ports:
       - "${FRONT_PORT:-8500}:8501"
     depends_on:
