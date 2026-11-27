@@ -177,6 +177,14 @@ services:
       PIPELINE_OUTPUT_DIR: /srv/data/output
     restart: unless-stopped
 
+  lesson-20-api:
+    build: ./Lesson 20/app/api
+    volumes:
+      - ./Lesson 20/app/config:/srv/config:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
   gateway:
     build: ./gateway
     environment:
@@ -199,6 +207,7 @@ services:
       LESSON_17_URL: http://lesson-17-api:8000
       LESSON_18_URL: http://lesson-18-api:8000
       LESSON_19_URL: http://lesson-19-api:8000
+      LESSON_20_URL: http://lesson-20-api:8000
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -221,6 +230,7 @@ services:
       - lesson-17-api
       - lesson-18-api
       - lesson-19-api
+      - lesson-20-api
     healthcheck:
       test:
         - CMD
@@ -256,6 +266,7 @@ services:
       LESSON_17_API_BASE_URL: http://gateway:8000/lesson-17
       LESSON_18_API_BASE_URL: http://gateway:8000/lesson-18
       LESSON_19_API_BASE_URL: http://gateway:8000/lesson-19
+      LESSON_20_API_BASE_URL: http://gateway:8000/lesson-20
     ports:
       - "${FRONT_PORT:-8500}:8501"
     depends_on:

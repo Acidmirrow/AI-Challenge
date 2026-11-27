@@ -1,0 +1,7 @@
+[theme]
+base = "dark"
+primaryColor = "#ff9d3d"
+
+[server]
+headless = true
+fileWatcherType = "poll"
